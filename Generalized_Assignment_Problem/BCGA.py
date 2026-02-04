@@ -2,7 +2,7 @@ import random
 import os
 
 POP_SIZE = 10
-GENERATIONS = 1
+GENERATIONS = 10
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
@@ -48,12 +48,7 @@ def read_gap_file(filename):
 
 def generate_initial_population(C, R, B, pop_size):
     """
-    Generate initial feasible population for Generalized Assignment Problem
-
-    C : cost matrix (m x n)
-    R : resource matrix (m x n)
-    B : capacity vector (m)
-    pop_size : number of chromosomes
+    Generate ONLY feasible initial population for GAP
     """
 
     m = len(C)       # number of agents
@@ -61,35 +56,37 @@ def generate_initial_population(C, R, B, pop_size):
 
     population = []
 
-    for _ in range(pop_size):
+    while len(population) < pop_size:
 
-        # Initialize chromosome and remaining capacity
         chromosome = [0] * (m * n)
-        remaining_capacity = B[:]   # copy
+        remaining_capacity = B[:]
+
+        feasible = True
 
         # Assign jobs one by one
         for j in range(n):
 
-            # Find feasible agents for job j
             feasible_agents = [
                 i for i in range(m)
                 if R[i][j] <= remaining_capacity[i]
             ]
 
-            # If no feasible agent exists, choose any agent (will be repaired later)
+            # ❌ If no feasible agent exists → discard chromosome
             if not feasible_agents:
-                chosen_agent = random.randint(0, m - 1)
-            else:
-                # Random feasible selection (for diversity)
-                chosen_agent = random.choice(feasible_agents)
+                feasible = False
+                break
 
-            # Assign job j to chosen agent
+            chosen_agent = random.choice(feasible_agents)
+
             chromosome[chosen_agent * n + j] = 1
             remaining_capacity[chosen_agent] -= R[chosen_agent][j]
 
-        population.append(chromosome)
+        # ✔ Keep only feasible chromosomes
+        if feasible:
+            population.append(chromosome)
 
     return population
+
 
 
 def fitness(chromosome, C):
@@ -113,41 +110,32 @@ def fitness(chromosome, C):
     return total_profit
 
 def repair(chromosome, R, B):
+    """
+    Feasibility checker for GAP.
+    Returns chromosome if feasible, otherwise returns None.
+    """
+
     m, n = len(B), len(R[0])
-    remaining = B[:]
 
-    # Fix assignment constraint
+    # ---------- Check assignment constraint ----------
     for j in range(n):
-        assigned = [i for i in range(m) if chromosome[i*n + j] == 1]
+        assigned = sum(chromosome[i*n + j] for i in range(m))
+        if assigned != 1:
+            return None
 
-        if len(assigned) == 0:
-            chromosome[random.randint(0, m-1)*n + j] = 1
+    # ---------- Check capacity constraint ----------
+    usage = [0] * m
 
-        elif len(assigned) > 1:
-            keep = random.choice(assigned)
-            for i in assigned:
-                chromosome[i*n + j] = 0
-            chromosome[keep*n + j] = 1
-
-    # Fix capacity constraint
     for i in range(m):
         for j in range(n):
             if chromosome[i*n + j] == 1:
-                remaining[i] -= R[i][j]
+                usage[i] += R[i][j]
+                if usage[i] > B[i]:
+                    return None
 
-        while remaining[i] < 0:
-            jobs = [j for j in range(n) if chromosome[i*n + j] == 1]
-            job = random.choice(jobs)
-            chromosome[i*n + job] = 0
-            remaining[i] += R[i][job]
-
-            for new_agent in range(m):
-                if R[new_agent][job] <= remaining[new_agent]:
-                    chromosome[new_agent*n + job] = 1
-                    remaining[new_agent] -= R[new_agent][job]
-                    break
-
+    # ✔ Feasible
     return chromosome
+
 
 def select(population, C):
     a, b = random.sample(population, 2)
@@ -184,10 +172,18 @@ def genetic_algorithm(C, R, B):
             p2 = select(population, C)
 
             c1, c2 = crossover(p1, p2)
-            c1 = repair(mutate(c1), R, B)
-            c2 = repair(mutate(c2), R, B)
 
-            new_population.extend([c1, c2])
+            # Child 1
+            c1 = mutate(c1)
+            c1 = repair(c1, R, B)
+            if c1 is not None:
+                new_population.append(c1)
+
+            # Child 2
+            c2 = mutate(c2)
+            c2 = repair(c2, R, B)
+            if c2 is not None:
+                new_population.append(c2)
 
         population = new_population[:POP_SIZE]
 
@@ -226,13 +222,13 @@ def solve_gap_file(filename):
 
 
 
-def solve_multiple_files(file_list, base_dir="gap_dataset"):
+def solve_multiple_files(file_list,base_dir="gap_dataset"):
     all_results = {}
     # Directory where BCGA.py is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
 
     for file in file_list:
-        file_path = os.path.join(script_dir, base_dir, file)
+        file_path = os.path.join( base_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
@@ -247,7 +243,8 @@ files = [
     "gap1.txt",
     # "gap2.txt", "gap3.txt","gap4.txt",
     # "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
-    # "gap9.txt","gap10.txt","gap11.txt","gap12.txt"
+    # "gap9.txt","gap10.txt","gap11.txt",
+    "gap12.txt"
 ]
 
 
