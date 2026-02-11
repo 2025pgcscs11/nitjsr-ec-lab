@@ -222,13 +222,13 @@ def solve_gap_file(filename):
 
 
 
-def solve_multiple_files(file_list,base_dir="gap_dataset"):
+def solve_multiple_files(file_list,base_dir="./gap_dataset"):
     all_results = {}
     # Directory where BCGA.py is located
     # script_dir = os.path.dirname(os.path.abspath(__file__))
 
     for file in file_list:
-        file_path = os.path.join( base_dir,file)
+        file_path = os.path.join(base_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
