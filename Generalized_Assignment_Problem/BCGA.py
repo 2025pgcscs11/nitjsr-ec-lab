@@ -158,6 +158,21 @@ def mutate(chromosome):
             chromosome[i] ^= 1
     return chromosome
 
+# def mutate(chromosome,C):
+#     m = len(C)       # number of agents
+#     n = len(C[0])
+#     for j in range(n):
+#         if random.random() < MUTATION_RATE:
+#             # remove current assignment
+#             for i in range(m):
+#                 chromosome[i*n + j] = 0
+            
+#             # assign to random agent
+#             new_agent = random.randint(0, m-1)
+#             chromosome[new_agent*n + j] = 1
+
+#     return chromosome
+
 
 def genetic_algorithm(C, R, B):
     population = generate_initial_population(C, R, B, POP_SIZE)
@@ -241,9 +256,9 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 
 files = [
     "gap1.txt",
-    # "gap2.txt", "gap3.txt","gap4.txt",
-    # "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
-    # "gap9.txt","gap10.txt","gap11.txt",
+    "gap2.txt", "gap3.txt","gap4.txt",
+    "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
+    "gap9.txt","gap10.txt","gap11.txt",
     "gap12.txt"
 ]
 
