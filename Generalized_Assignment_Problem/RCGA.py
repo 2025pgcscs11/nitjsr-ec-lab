@@ -1,10 +1,14 @@
 import random
 import os
 
-POP_SIZE = 10
-GENERATIONS = 10
+POP_SIZE = 100
+GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
+DISTRIBUTIOIN_INDEX = 20
+MUTATION_DISTRIBUTION_INDEX = 20
+UPPER_LIMIT = 30
+LOWER_LIMIT = 0
 
 def generate_initial_population(C, R, B, pop_size):
     """
@@ -38,7 +42,7 @@ def generate_initial_population(C, R, B, pop_size):
 
             chosen_agent = random.choice(feasible_agents)
 
-            chromosome[chosen_agent * n + j] = 1
+            chromosome[j] = chosen_agent
             remaining_capacity[chosen_agent] -= R[chosen_agent][j]
 
         # ✔ Keep only feasible chromosomes
@@ -49,12 +53,24 @@ def generate_initial_population(C, R, B, pop_size):
 
 
 
-def fitness(chromosome, C):
+def decode_gene(gene, m, lower=0, upper=30):
     """
-    Compute fitness (total profit) of a chromosome for GAP
+    Convert real gene value back to agent index.
+    """
 
-    chromosome : binary list of length m*n
-    C : cost matrix (m x n)
+    # Scale back to [0, m-1]
+    agent = int(round((gene - lower) / (upper - lower) * (m - 1)))
+
+    # Clamp to valid range
+    agent = max(0, min(m - 1, agent))
+
+    return agent
+
+
+def fitness(chromosome, C, lower=0, upper=30):
+    """
+    Compute total profit for RCGA encoding.
+    chromosome[j] = scaled real value representing agent.
     """
 
     m = len(C)
@@ -62,38 +78,30 @@ def fitness(chromosome, C):
 
     total_profit = 0
 
-    for i in range(m):          # agents
-        for j in range(n):      # jobs
-            index = i * n + j
-            total_profit += C[i][j] * chromosome[index]
+    for j in range(n):
+        agent = decode_gene(chromosome[j], m, lower, upper)
+        total_profit += C[agent][j]
 
     return total_profit
 
-def repair(chromosome, R, B):
+def repair(chromosome, R, B, lower=0, upper=30):
     """
-    Feasibility checker for GAP.
-    Returns chromosome if feasible, otherwise returns None.
+    Check capacity feasibility for RCGA encoding.
+    Returns chromosome if feasible, otherwise None.
     """
 
-    m, n = len(B), len(R[0])
+    m = len(B)
+    n = len(chromosome)
 
-    # ---------- Check assignment constraint ----------
-    for j in range(n):
-        assigned = sum(chromosome[i*n + j] for i in range(m))
-        if assigned != 1:
-            return None
-
-    # ---------- Check capacity constraint ----------
     usage = [0] * m
 
-    for i in range(m):
-        for j in range(n):
-            if chromosome[i*n + j] == 1:
-                usage[i] += R[i][j]
-                if usage[i] > B[i]:
-                    return None
+    for j in range(n):
+        agent = decode_gene(chromosome[j], m, lower, upper)
+        usage[agent] += R[agent][j]
 
-    # ✔ Feasible
+        if usage[agent] > B[agent]:
+            return None
+
     return chromosome
 
 
@@ -103,35 +111,81 @@ def select(population, C):
 
 
 def crossover(p1, p2):
-    if random.random() < CROSSOVER_RATE:
-        point = random.randint(1, len(p1) - 2)
-        return (
-            p1[:point] + p2[point:],
-            p2[:point] + p1[point:]
-        )
-    return p1[:], p2[:]
+    """
+    Simulated Binary Crossover (SBX)
+
+    p1, p2 : parent chromosomes (list of real values)
+    CROSSOVER_RATE : probability of crossover
+    nc : distribution index (controls spread)
+    """
+
+    # If random number >= crossover rate → children = parents
+    if random.random() >= CROSSOVER_RATE:
+        return p1[:], p2[:]
+
+    child1 = []
+    child2 = []
+
+    for x1, x2 in zip(p1, p2):
+
+        u = random.random()
+
+        # Compute beta
+        if u <= 0.5:
+            beta = (2 * u) ** (1.0 / (DISTRIBUTIOIN_INDEX + 1))
+        else:
+            beta = (1 / (2 * (1 - u))) ** (1.0 / (DISTRIBUTIOIN_INDEX + 1))
+
+        # Generate children
+        c1 = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
+        c2 = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
+
+        child1.append(c1)
+        child2.append(c2)
+
+    return child1, child2
 
 
-# def mutate(chromosome):
-#     for i in range(len(chromosome)):
-#         if random.random() < MUTATION_RATE:
-#             chromosome[i] ^= 1
-#     return chromosome
+def mutate(chromosome):
+    """
+    Polynomial Mutation
 
-def mutate(chromosome,C):
-    m = len(C)       # number of agents
-    n = len(C[0])
-    for j in range(n):
+    chromosome : list of real values
+    """
+
+    for i in range(len(chromosome)):
+
         if random.random() < MUTATION_RATE:
-            # remove current assignment
-            for i in range(m):
-                chromosome[i*n + j] = 0
-            
-            # assign to random agent
-            new_agent = random.randint(0, m-1)
-            chromosome[new_agent*n + j] = 1
+
+            r = random.random()
+
+            if r < 0.5:
+                delta = (2 * r) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1)) - 1
+            else:
+                delta = 1 - (2 * (1 - r)) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1))
+
+            # Apply mutation
+            chromosome[i] = chromosome[i] + delta * (UPPER_LIMIT - LOWER_LIMIT)
+
+            # Keep within bounds
+            chromosome[i] = max(LOWER_LIMIT, min(UPPER_LIMIT, chromosome[i]))
 
     return chromosome
+
+# def mutate(chromosome,C):
+#     m = len(C)       # number of agents
+#     n = len(C[0])
+#     for j in range(n):
+#         if random.random() < MUTATION_RATE:
+#             # remove current assignment
+#             for i in range(m):
+#                 chromosome[i*n + j] = 0
+            
+#             # assign to random agent
+#             new_agent = random.randint(0, m-1)
+#             chromosome[new_agent*n + j] = 1
+
+#     return chromosome
 
 
 def genetic_algorithm(C, R, B):
@@ -149,13 +203,13 @@ def genetic_algorithm(C, R, B):
             c1, c2 = crossover(p1, p2)
 
             # Child 1
-            c1 = mutate(c1,C)
+            c1 = mutate(c1)
             c1 = repair(c1, R, B)
             if c1 is not None:
                 new_population.append(c1)
 
             # Child 2
-            c2 = mutate(c2,C)
+            c2 = mutate(c2)
             c2 = repair(c2, R, B)
             if c2 is not None:
                 new_population.append(c2)
@@ -256,18 +310,12 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 
 
 files = [
-    # "gap1.txt",
-    # "gap2.txt",
-    # "gap3.txt",
-    # "gap4.txt",
-    # "gap5.txt",
-    # "gap6.txt",
-    # "gap7.txt",
-    # "gap8.txt",
-    # "gap9.txt",
-    # "gap10.txt",
-    # "gap11.txt",
+    "gap1.txt",
+    "gap2.txt", "gap3.txt","gap4.txt",
+    "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
+    "gap9.txt","gap10.txt","gap11.txt",
     "gap12.txt"
 ]
+
 
 solve_multiple_files(files)
