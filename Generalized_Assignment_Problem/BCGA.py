@@ -8,6 +8,8 @@ MUTATION_RATE = 0.1
 
 
 def generate_initial_population(C, R, B):
+
+def generate_initial_population(C, R, B, pop_size):
     """
     Generate ONLY feasible initial population for GAP
     """
@@ -165,6 +167,27 @@ def mutate(chromosome):
             chromosome[i] ^= 1
     return chromosome
 
+# def mutate(chromosome):
+#     for i in range(len(chromosome)):
+#         if random.random() < MUTATION_RATE:
+#             chromosome[i] ^= 1
+#     return chromosome
+
+def mutate(chromosome,C):
+    m = len(C)       # number of agents
+    n = len(C[0])
+    for j in range(n):
+        if random.random() < MUTATION_RATE:
+            # remove current assignment
+            for i in range(m):
+                chromosome[i*n + j] = 0
+            
+            # assign to random agent
+            new_agent = random.randint(0, m-1)
+            chromosome[new_agent*n + j] = 1
+
+    return chromosome
+
 
 def genetic_algorithm(C, R, B):
     population = generate_initial_population(C, R, B)
@@ -183,12 +206,16 @@ def genetic_algorithm(C, R, B):
             # Child 1
             c1 = mutate(c1)
             c1 = feasibility_check(c1, R, B)
+            c1 = mutate(c1,C)
+            c1 = repair(c1, R, B)
             if c1 is not None:
                 new_population.append(c1)
 
             # Child 2
             c2 = mutate(c2)
             c2 = feasibility_check(c2, R, B)
+            c2 = mutate(c2,C)
+            c2 = repair(c2, R, B)
             if c2 is not None:
                 new_population.append(c2)
 
@@ -203,6 +230,46 @@ def genetic_algorithm(C, R, B):
         print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
 
     return best_solution, best_fitness
+
+
+def read_gap_file(filename):
+    """
+    Reads a GAP data file and returns a list of problem instances.
+    Each instance is a tuple: (C, R, B)
+    """
+    instances = []
+
+    with open(filename, 'r') as f:
+        data = list(map(int, f.read().split()))
+
+    idx = 0
+    P = data[idx]
+    idx += 1
+
+    for _ in range(P):
+        m = data[idx]
+        n = data[idx + 1]
+        idx += 2
+
+        # Cost matrix
+        C = []
+        for _ in range(m):
+            C.append(data[idx:idx+n])
+            idx += n
+
+        # Resource matrix
+        R = []
+        for _ in range(m):
+            R.append(data[idx:idx+n])
+            idx += n
+
+        # Capacities
+        B = data[idx:idx+m]
+        idx += m
+
+        instances.append((C, R, B))
+
+    return instances
 
 
 def solve_gap_file(filename):
@@ -278,9 +345,15 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 
     # Full path to dataset folder
     dataset_dir = os.path.join(script_dir, base_dir)
+    # Absolute path of current script directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Full path to dataset folder
+    dataset_dir = os.path.join(script_dir, base_dir)
 
     for file in file_list:
         file_path = os.path.join( dataset_dir,file)
+        file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
@@ -297,8 +370,22 @@ files = [
     "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
     "gap9.txt","gap10.txt","gap11.txt",
     "gap12.txt"     
+    # "gap1.txt",
+    # "gap2.txt",
+    # "gap3.txt",
+    # "gap4.txt",
+    # "gap5.txt",
+    # "gap6.txt",
+    # "gap7.txt",
+    # "gap8.txt",
+    # "gap9.txt",
+    # "gap10.txt",
+    # "gap11.txt",
+    "gap12.txt"
 ]
 
 # Execution starts here
 if __name__ == "__main__": 
     solve_multiple_files(files)
+
+solve_multiple_files(files)
