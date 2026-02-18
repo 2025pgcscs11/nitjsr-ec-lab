@@ -7,7 +7,7 @@ CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
 
-def generate_initial_population(C, R, B, pop_size):
+def generate_initial_population(C, R, B):
     """
     Generate ONLY feasible initial population for GAP
     """
@@ -60,13 +60,13 @@ def fitness(chromosome, C, R, B, penalty_weight=1000):
         used = 0
         for j in range(n):
             index = i * n + j
-            if chromosome[index] == 1:
+            if chromosome[index] == 1:            # wrong
                 total_profit += R[i][j]
                 used += C[i][j]
 
         # capacity violation
-        if used > B[i]:
-            penalty += max(0,(used - B[i]))
+        # if used > B[i]:
+        #     penalty += max(0,(used - B[i]))
 
     return total_profit - penalty_weight * penalty
 
@@ -159,11 +159,11 @@ def crossover(p1, p2):
     return p1[:], p2[:]
 
 
-def mutate(chromosome):
-    for i in range(len(chromosome)):
-        if random.random() < MUTATION_RATE:
-            chromosome[i] ^= 1
-    return chromosome
+# def mutate(chromosome):
+#     for i in range(len(chromosome)):
+#         if random.random() < MUTATION_RATE:
+#             chromosome[i] ^= 1
+#     return chromosome
 
 # def mutate(chromosome):
 #     for i in range(len(chromosome)):
@@ -202,18 +202,18 @@ def genetic_algorithm(C, R, B):
             c1, c2 = crossover(p1, p2)
 
             # Child 1
-            c1 = mutate(c1)
-            c1 = feasibility_check(c1, R, B)
             c1 = mutate(c1,C)
-            c1 = repair(c1, R, B)
+            c1 = feasibility_check(c1, R, B)
+      
+            # c1 = repair(c1, R, B)
             if c1 is not None:
                 new_population.append(c1)
 
             # Child 2
-            c2 = mutate(c2)
-            c2 = feasibility_check(c2, R, B)
             c2 = mutate(c2,C)
-            c2 = repair(c2, R, B)
+            c2 = feasibility_check(c2, R, B)
+
+            # c2 = repair(c2, R, B)
             if c2 is not None:
                 new_population.append(c2)
 
@@ -362,18 +362,12 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 
 
 # All files name
-files = [   
-    "gap1.txt",
-    "gap2.txt",
-    "gap3.txt",
-    "gap4.txt",
-    "gap5.txt",
-    "gap6.txt",
-    "gap7.txt",
-    "gap8.txt",
-    "gap9.txt",
-    "gap10.txt",
-    "gap11.txt",
+files = [
+    # "gap1.txt",
+    # "gap2.txt", "gap3.txt","gap4.txt",
+    # "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
+    # "gap9.txt","gap10.txt","gap11.txt",    
+    "gap12.txt"
 ]
 
 # Execution starts here

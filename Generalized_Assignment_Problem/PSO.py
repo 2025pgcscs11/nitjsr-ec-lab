@@ -2,55 +2,94 @@ import random
 import os
 
 # ALL NECESSARY CONSTANT PARAMETERS
-POP_SIZE = 100          # POPULATION SIZE
-ITERATIONS = 100        # NUMBER OF ITERATIONS 
-LOWER_BOUND = 0         # LOWER BOUND VALUE OF DECISION VARIABLES
-UPPER_BOUND = 10        # UPPER BOUND VALUE OF DECISION VARIABLES
+POP_SIZE = 10          # POPULATION SIZE
+ITERATIONS = 10        # NUMBER OF ITERATIONS 
+# LOWER_BOUND = 0         # LOWER BOUND VALUE OF DECISION VARIABLES
+# UPPER_BOUND = 10        # UPPER BOUND VALUE OF DECISION VARIABLES
 INTERTUIA = 0.7         # INTERTIA OF THE A PARTICALE
 C1 = 1.5                # ACCERALATION COEFFICIENT
 C2 = 1.5                # ACCERALATION COEFFICIENT
 
 
-def generate_initial_population(C, R, B, POP_SIZE):
-    """
-    Generate ONLY feasible initial population for GAP
-    """
-
-    m = len(C)       # number of agents
-    n = len(C[0])    # number of jobs
-
+# ==========================================================
+# INITIAL POPULATION 
+# ==========================================================
+def generate_initial_population(m, n):
     population = []
 
-    while len(population) < POP_SIZE:
+    for _ in range(POP_SIZE):
+        particle = [0] * (n)
 
-        chromosome = [0] * (m * n)
-        remaining_capacity = B[:]
-
-        feasible = True
-
-        # Assign jobs one by one
+        # Each job assigned to exactly one agent
         for j in range(n):
+            agent = random.randint(0, m - 1)
+            particle[j] = agent
 
-            feasible_agents = [
-                i for i in range(m)
-                if R[i][j] <= remaining_capacity[i]
-            ]
-
-            # If no feasible agent exists → discard chromosome
-            if not feasible_agents:
-                feasible = False
-                break
-
-            chosen_agent = random.choice(feasible_agents)
-
-            chromosome[chosen_agent * n + j] = 1
-            remaining_capacity[chosen_agent] -= R[chosen_agent][j]
-
-        # ✔ Keep only feasible chromosomes
-        if feasible:
-            population.append(chromosome)
+        population.append(particle)
 
     return population
+
+
+# ==========================================================
+# FITNESS FUNCTION (Maximization with Penalty)
+# ==========================================================
+def fitness(particle, C, R, B, penalty_weight=1000):
+    cost = 0
+    penalty = 0
+    for i in range(len(particle)):
+        resource_used = 0
+        cost += C[particle[i]][i]
+        resource_used += R[particle[i]][i]
+
+        # Capacity Violation
+        if resource_used > B[particle[i]]:
+            penalty += max(0,(resource_used - B[i]))
+
+    return cost - penalty_weight * penalty
+
+
+# ==========================================================
+# INITIAL VELOCITY
+# ==========================================================
+def generate_initial_velocity(m,n):
+    velocity = []
+
+    for _ in range(POP_SIZE):
+        partical_velocity = [0] * (n)
+        velocity.append(partical_velocity)
+
+    return velocity
+
+
+# ==========================================================
+# PARTICLE SWARM OPTIMIZATION( PSO )
+# ==========================================================
+def particale_swarm_optimization(C, R, B):
+    m = len(C)       # number of agents
+    n = len(C[0])    # number of jobs
+    initial_population = generate_initial_population(m,n)
+    initial_velocity = generate_initial_velocity(m,n)
+    intitial_population_fitness = fitness(particle,C,R,B) for particle in range(initial_population)
+
+    best_solution = None
+    best_fitness = float('-inf')
+
+    for gen in range(ITERATIONS):
+        new_population = []
+
+        while len(new_population) < POP_SIZE:
+           
+        # population = new_population[:POP_SIZE]
+
+        # for chrom in population:
+        #     f = fitness(chrom, C,R,B)
+        #     if f > best_fitness:
+        #         best_fitness = f
+        #         best_solution = chrom
+
+        # print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
+
+    # return best_solution, best_fitness
 
 
 def read_gap_file(filename):
@@ -201,6 +240,5 @@ files = [
 
 # Execution starts here
 if __name__ == "__main__": 
-    solve_multiple_files(files)
-
-solve_multiple_files(files)
+    # solve_multiple_files(files)
+    generate_initial_population(5,15)
