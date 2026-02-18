@@ -1,0 +1,156 @@
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap1.txt =====
+
+Instance 1:
+  PSO Best Fitness = -1692
+Instance 2:
+  PSO Best Fitness = -685
+Instance 3:
+  PSO Best Fitness = 291
+Instance 4:
+  PSO Best Fitness = -697
+Instance 5:
+  PSO Best Fitness = 310
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap2.txt =====
+
+Instance 1:
+  PSO Best Fitness = 371
+Instance 2:
+  PSO Best Fitness = 381
+Instance 3:
+  PSO Best Fitness = 386
+Instance 4:
+  PSO Best Fitness = 382
+Instance 5:
+  PSO Best Fitness = 395
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap3.txt =====
+
+Instance 1:
+  PSO Best Fitness = 529
+Instance 2:
+  PSO Best Fitness = -473
+Instance 3:
+  PSO Best Fitness = 534
+Instance 4:
+  PSO Best Fitness = 533
+Instance 5:
+  PSO Best Fitness = 513
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap4.txt =====
+
+Instance 1:
+  PSO Best Fitness = 581
+Instance 2:
+  PSO Best Fitness = 571
+Instance 3:
+  PSO Best Fitness = 574
+Instance 4:
+  PSO Best Fitness = 561
+Instance 5:
+  PSO Best Fitness = 623
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap5.txt =====
+
+Instance 1:
+  PSO Best Fitness = 520
+Instance 2:
+  PSO Best Fitness = -1526
+Instance 3:
+  PSO Best Fitness = 504
+Instance 4:
+  PSO Best Fitness = 489
+Instance 5:
+  PSO Best Fitness = 511
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap6.txt =====
+
+Instance 1:
+  PSO Best Fitness = 679
+Instance 2:
+  PSO Best Fitness = -1316
+Instance 3:
+  PSO Best Fitness = 679
+Instance 4:
+  PSO Best Fitness = -1350
+Instance 5:
+  PSO Best Fitness = 662
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap7.txt =====
+
+Instance 1:
+  PSO Best Fitness = 838
+Instance 2:
+  PSO Best Fitness = 803
+Instance 3:
+  PSO Best Fitness = 820
+Instance 4:
+  PSO Best Fitness = -211
+Instance 5:
+  PSO Best Fitness = -3184
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap8.txt =====
+
+Instance 1:
+  PSO Best Fitness = -12029
+Instance 2:
+  PSO Best Fitness = -8056
+Instance 3:
+  PSO Best Fitness = -1016
+Instance 4:
+  PSO Best Fitness = -34
+Instance 5:
+  PSO Best Fitness = -5042
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap9.txt =====
+
+Instance 1:
+  PSO Best Fitness = -398
+Instance 2:
+  PSO Best Fitness = 647
+Instance 3:
+  PSO Best Fitness = 628
+Instance 4:
+  PSO Best Fitness = -3361
+Instance 5:
+  PSO Best Fitness = 600
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap10.txt =====
+
+Instance 1:
+  PSO Best Fitness = 871
+Instance 2:
+  PSO Best Fitness = 815
+Instance 3:
+  PSO Best Fitness = 834
+Instance 4:
+  PSO Best Fitness = -2172
+Instance 5:
+  PSO Best Fitness = -2164
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap11.txt =====
+
+Instance 1:
+  PSO Best Fitness = 928
+Instance 2:
+  PSO Best Fitness = 909
+Instance 3:
+  PSO Best Fitness = 952
+Instance 4:
+  PSO Best Fitness = 918
+Instance 5:
+  PSO Best Fitness = 983
+
+===== Solving file: /media/popanda/DATA/MTECH CSE NIT JAMSHEDPUR/2 ND SEMESTER/CS4206.EVOLUTIONARY COMPUTATION LABORATORY/nitjsr-ec-lab/Generalized_Assignment_Problem/gap_dataset/gap12.txt =====
+
+Instance 1:
+  PSO Best Fitness = -729
+Instance 2:
+  PSO Best Fitness = 1223
+Instance 3:
+  PSO Best Fitness = 1221
+Instance 4:
+  PSO Best Fitness = -25754
+Instance 5:
+  PSO Best Fitness = 1218
