@@ -1,52 +1,36 @@
+# ==========================================================
+# IMPORTS MODULE HERE
+# ==========================================================
 import random
 import os
 
-POP_SIZE = 10
-GENERATIONS = 10
+# ==========================================================
+# CONSTANT PARAMETERS
+# ==========================================================
+POP_SIZE = 200
+GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
+# ==========================================================
+# INITIAL POPULATION
+# ==========================================================
 
-def generate_initial_population(C, R, B):
-    """
-    Generate ONLY feasible initial population for GAP
-    """
+def generate_initial_population_binary(pop_size, m, n):
+    # Generate random integers in [0, m-1]
+    population_int = np.random.randint(0, m, size=(pop_size, n))
+    
+    # Number of bits needed to represent values up to m-1
+    num_bits = int(np.ceil(np.log2(m)))
+    
+    # Convert integers to binary representation
+    population_bin = ((population_int[:, :, None] & (1 << np.arange(num_bits)[::-1])) > 0).astype(int)
+    
+    return population_bin
 
-    m = len(C)       # number of agents
-    n = len(C[0])    # number of jobs
-
-    population = []
-
-    while len(population) < POP_SIZE:
-
-        chromosome = [0] * (m * n)
-        remaining_capacity = B[:]
-
-        feasible = True
-
-        # Assign jobs one by one
-        for j in range(n):
-
-            feasible_agents = [
-                i for i in range(m)
-                if R[i][j] <= remaining_capacity[i]
-            ]
-
-            # If no feasible agent exists → discard chromosome
-            if not feasible_agents:
-                feasible = False
-                break
-
-            chosen_agent = random.choice(feasible_agents)
-
-            chromosome[chosen_agent * n + j] = 1
-            remaining_capacity[chosen_agent] -= R[chosen_agent][j]
-
-        # ✔ Keep only feasible chromosomes
-        if feasible:
-            population.append(chromosome)
-
-    return population
+# Example usage
+pop_bin = generate_initial_population_binary(5, 4, 3)
+print(pop_bin)
 
 
 def fitness(chromosome, C, R, B, penalty_weight=1000):

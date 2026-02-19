@@ -1,4 +1,6 @@
-import random
+# ==========================================================
+# IMPORTS MODULE HERE
+# ==========================================================
 import os
 import numpy as np
 
@@ -32,7 +34,7 @@ def fitness(particle, C, R, B, penalty_weight=1000):
     resource_used = [0] * m
 
     for j in range(len(particle)):
-        agent = int(particle[j])
+        agent = np.clip(int(round(particle[j])),0,m-1)     
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
 
@@ -92,11 +94,11 @@ def particle_swarm_optimization(C, R, B):
             population[i] += velocity[i]
 
             # Discretize & bound
-            population[i] = np.clip(
-                np.round(population[i]),
-                0,
-                m - 1
-            )
+            # population[i] = np.clip(
+            #     np.round(population[i]),
+            #     0,
+            #     m - 1
+            # )
 
             # Fitness
             fitness_values[i] = fitness(population[i], C, R, B)
