@@ -7,7 +7,7 @@ import numpy as np
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 200
+POP_SIZE = 500
 ITERATIONS = 1000
 INTERTIA = 0.7
 C1 = 1.5
@@ -57,7 +57,7 @@ def generate_initial_velocity(pop_size, n):
 # ==========================================================
 def particle_swarm_optimization(C, R, B):
 
-    m = len(C)
+    m = len(C)          
     n = len(C[0])
 
     # Initialize

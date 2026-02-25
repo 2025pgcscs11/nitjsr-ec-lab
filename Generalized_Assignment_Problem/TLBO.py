@@ -7,8 +7,8 @@ import numpy as np
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 500
-ITERATIONS = 1000
+POP_SIZE = 200
+ITERATIONS = 100
 TEACHING_FACTOR = 2
 
 

@@ -8,7 +8,7 @@ import numpy as np
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 100
+POP_SIZE = 10
 GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
@@ -77,9 +77,9 @@ def fitness(chromosome, C, R, B, penalty_weight=1000):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
 
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
+    # for a in range(m):
+    #     if resource_used[a] > B[a]:
+    #         penalty += (resource_used[a] - B[a])
 
     return cost - penalty_weight * penalty
 
@@ -93,7 +93,6 @@ def feasibility_check(chromosome, R, B):
     agents = decode_chromosome(chromosome, m)
     usage = [0] * m
 
-    # ---- Boundry Check ---- 
     for j, agent in enumerate(agents):  
         # ---- Boundry Check ----   
         if agent < 0 or agent >= m:
@@ -104,7 +103,7 @@ def feasibility_check(chromosome, R, B):
         if usage[agent] > B[agent]:
             return None
 
-    # ✔ Feasible
+    # Feasible
     return chromosome
 
 # ==========================================================
@@ -116,7 +115,7 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
     competitors = random.sample(range(POP_SIZE), k)
 
     # Find best among them
-    best_index = competitors[0]
+    best_index = 0
 
     for idx in competitors:
         if minimize:
@@ -206,7 +205,7 @@ def genetic_algorithm(C, R, B):
         new_population = []
 
         fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
-        
+
         for i in range(POP_SIZE // 2):
             # Select a parent
             p1 = tournament_selection(population,fitness_values)
@@ -234,6 +233,7 @@ def genetic_algorithm(C, R, B):
         else:
             combined_population = population
 
+         
         feasible_population = []
         for chromosome in combined_population:
             if feasibility_check(chromosome, R, B) is not None:
