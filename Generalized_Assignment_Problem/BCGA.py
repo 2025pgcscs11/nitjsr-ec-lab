@@ -8,7 +8,7 @@ import numpy as np
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 100
+POP_SIZE = 200
 GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
@@ -63,7 +63,7 @@ def decode_chromosome(chromosome, m):
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(chromosome, C, R, B, penalty_weight=1000):
+def fitness(chromosome, C, R, B, penalty_weight=10):
     cost = 0
     penalty = 0
 
@@ -111,14 +111,14 @@ def feasibility_check(chromosome, R, B):
 # SELECT A PARENT 
 # ==========================================================
 def tournament_selection(population, fitness_values, k=3, minimize=False):
-    # Randomly select k individuals
-    k = min(k, POP_SIZE) 
-    competitors = random.sample(range(POP_SIZE), k)
+    pop_size = len(population)                     # use current size
+    k = min(k, pop_size)                            # ensure k ≤ pop_size
+    if pop_size == 0:
+        raise ValueError("Population is empty – cannot select parents.")
+    competitors = random.sample(range(pop_size), k)
 
-    # Find best among them
     best_index = competitors[0]
-
-    for idx in competitors:
+    for idx in competitors[1:]:
         if minimize:
             if fitness_values[idx] < fitness_values[best_index]:
                 best_index = idx
@@ -127,7 +127,6 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
                 best_index = idx
 
     return population[best_index]
-
 
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
@@ -190,12 +189,9 @@ def mutate(chromosome):
 # ==========================================================
 # BINARY-CODED GENETIC ALGORITHM
 # ==========================================================
-def genetic_algorithm(C, R, B):
-    m = len(C)       # number of agents
-    n = len(C[0])    # number of jobs 
-    
+def binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CROSSOVER_RATE, MUTATION_RATE, k):
     # Generate Initial Population
-    population = generate_initial_population(m,n)
+    population = generate_initial_population(POP_SIZE,)
 
     # Store best chromosome
     best_solution = None
@@ -208,39 +204,25 @@ def genetic_algorithm(C, R, B):
         fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
         
         for i in range(POP_SIZE // 2):
-            # Select a parent
-            p1 = tournament_selection(population,fitness_values)
-            p2 = tournament_selection(population,fitness_values)
+            p1 = tournament_selection(population, fitness_values)
+            p2 = tournament_selection(population, fitness_values)
 
             c1, c2 = crossover(p1, p2)
 
-            # Child 1
             c1 = mutate(c1)
-            # c1 = feasibility_check(c1, R, B)
-      
-            # if c1 is not None:
-            #     new_population.append(c1)
-
-            # Child 2
             c2 = mutate(c2)
-            # c2 = feasibility_check(c2, R, B)
 
-            # if c2 is not None:
-            #     new_population.append(c2)
+            new_population.append(c1)      # now added
+            new_population.append(c2)      # now added
             
 
-        if new_population:
-            combined_population = population + new_population
-        else:
-            combined_population = population
+        # Combine parents and offspring
+        combined_population = population + new_population
 
-        feasible_population = []
-        for chromosome in combined_population:
-            if feasibility_check(chromosome, R, B) is not None:
-                feasible_population.append(chromosome)
-
-        population = sorted(feasible_population,key=lambda x: fitness(x, C, R, B),reverse=True)
-        population = population[:POP_SIZE]
+        # Sort all individuals by fitness (descending) and keep the best POP_SIZE
+        combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
+        sorted_indices = np.argsort(combined_fitness)[::-1]          # descending order
+        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
         
         for chrom in population:
             f = fitness(chrom, C,R,B)
@@ -304,7 +286,12 @@ def solve_gap_file(filename):
     for idx, (C, R, B) in enumerate(instances, start=1):
         print(f"Instance {idx}:")
 
-        best_assignment, best_cost = genetic_algorithm(C, R, B)
+        lb = 0
+        ub = len(C[0]) - 1
+        n  = int(np.ceil(np.log2(ub)))
+        k  = 3
+
+        best_assignment, best_cost = binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CROSSOVER_RATE, MUTATION_RATE, k)
 
         print(f"  Genetic Algorithm: Best Cost = {best_cost}")
 
@@ -321,11 +308,6 @@ def solve_gap_file(filename):
 def solve_multiple_files(file_list,base_dir="gap_dataset"):
     all_results = {}
     
-    # Absolute path of current script directory
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Full path to dataset folder
-    dataset_dir = os.path.join(script_dir, base_dir)
     # Absolute path of current script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
