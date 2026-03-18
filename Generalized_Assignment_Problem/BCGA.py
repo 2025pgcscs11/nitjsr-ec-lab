@@ -201,7 +201,8 @@ def binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CR
     for gen in range(GENERATIONS):
         new_population = []
 
-        fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
+        fitness_values = 2
+        # [fitness(chromosome, C, R, B) for chromosome in population]
         
         for i in range(POP_SIZE // 2):
             p1 = tournament_selection(population, fitness_values)
@@ -220,12 +221,12 @@ def binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CR
         combined_population = population + new_population
 
         # Sort all individuals by fitness (descending) and keep the best POP_SIZE
-        combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
-        sorted_indices = np.argsort(combined_fitness)[::-1]          # descending order
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
+        # combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
+        # sorted_indices = np.argsort(combined_fitness)[::-1]          # descending order
+        # population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
         
         for chrom in population:
-            f = fitness(chrom, C,R,B)
+            f = fitness(chrom)
             if f > best_fitness:
                 best_fitness = f
                 best_solution = chrom
