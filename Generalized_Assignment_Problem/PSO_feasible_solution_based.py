@@ -45,6 +45,27 @@ def fitness(particle, C, R, B, penalty_weight=1000):
     return cost - penalty_weight * penalty
 
 
+# ===============================================================
+# FEASIBLE POPULATION GENERATION USING RANDOM ASSIGNMENT APPROACH
+# ===============================================================
+def feasible_solution(C, R,B,solution_size):
+    m = len(C)      # Agent Size       
+    n = len(C[0])   # Job Size
+    feasible_population=np.zeros((solution_size, n))
+    
+    for soloution in range(solution_size):
+        excluded = {}
+        for job in range(n):
+            job_index = np.random.choice([x for x in range(0, m) if x not in excluded]) # random job
+            excluded.add(job_index)
+            agent_index = np.random.randint(0, m)
+            
+            while B[agent_index] < R[agent_index][job_index]:
+                agent_index = np.random.randint(0, m)
+
+            B[agent_index] -= R[agent_index][job_index]
+
+
 # ==========================================================
 # INITIAL VELOCITY
 # ==========================================================
@@ -195,18 +216,19 @@ def solve_multiple_files(file_list, base_dir="gap_dataset"):
 # MAIN
 # ==========================================================
 files = [
-    "gap1.txt",
-    "gap2.txt",
-    "gap3.txt",
-    "gap4.txt",
-    "gap5.txt",
-    "gap6.txt",
-    "gap7.txt",
-    "gap8.txt",
-    "gap9.txt",
-    "gap10.txt",
-    "gap11.txt",
-    "gap12.txt",
+    "gap_sample_data_txt.txt"
+    # "gap1.txt",
+    # "gap2.txt",
+    # "gap3.txt",
+    # "gap4.txt",
+    # "gap5.txt",
+    # "gap6.txt",
+    # "gap7.txt",
+    # "gap8.txt",
+    # "gap9.txt",
+    # "gap10.txt",
+    # "gap11.txt",
+    # "gap12.txt",
 ]
 
 if __name__ == "__main__":

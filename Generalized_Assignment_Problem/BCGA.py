@@ -331,7 +331,8 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 # ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap1.txt",
+    "gap_sample_data_txt.txt"
+    # "gap1.txt",
     # "gap2.txt", "gap3.txt","gap4.txt",
     # "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
     # "gap9.txt","gap10.txt","gap11.txt",    
