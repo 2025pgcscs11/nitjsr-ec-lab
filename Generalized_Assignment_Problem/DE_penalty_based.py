@@ -1,3 +1,4 @@
+
 # ==========================================================
 # IMPORTS MODULE HERE
 # ==========================================================
@@ -9,42 +10,34 @@ import numpy as np
 # ==========================================================
 POP_SIZE = 500
 ITERATIONS = 200
-INTERTIA = 0.7
-C1 = 1.5
-C2 = 1.5
+SCALING_FACTOR = 0.85
+CROSSOVER_RATE = 0.8
 
 
 # ==========================================================
 # INITIAL POPULATION
 # ==========================================================
 def generate_initial_population(pop_size, m, n):
-    # Each particle: length n (jobs), values in [0, m-1]
-    return np.random.randint(0, m, size=(pop_size, n))
-
-
-# ==========================================================
-# INITIAL VELOCITY
-# ==========================================================
-def generate_initial_velocity(pop_size, n):
-    return np.random.uniform(1, 10, size=(pop_size, n))
+    # Each chromosome: length n (jobs), values in [0, m-1]
+    return np.random.randint(0, m-1, size=(pop_size, n))
 
 
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(particle, C, R, B, penalty_weight=1000):
+def fitness(vector, C, R, B, penalty_weight=1000):
     cost = 0
     penalty = 0
 
     m = len(B)
     resource_used = [0] * m
-
-    agents = particle.astype(int)
+    
+    agents = vector.astype(int)
 
     for j, agent in enumerate(agents):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
-    
+
     for a in range(m):
         if resource_used[a] > B[a]:
             penalty += (resource_used[a] - B[a])
@@ -52,69 +45,60 @@ def fitness(particle, C, R, B, penalty_weight=1000):
     return cost - penalty_weight * penalty
 
 
+
 # ==========================================================
-# PARTICLE SWARM OPTIMIZATION
+# DIFFERENTIAL EVOLUTION BASED OPTIMIZATION
 # ==========================================================
-def particle_swarm_optimization(C, R, B):
+def differential_evolution_based_optimization(C, R, B):
+
     m = len(C)      # number of Agents
     n = len(C[0])   # number of Jobs
 
-    # Initialize population and velocity
-    population = generate_initial_population(POP_SIZE, m, n).astype(float)
-    velocity = generate_initial_velocity(POP_SIZE, n)
+    # Initialize random target vector
+    target_vector = generate_initial_population(POP_SIZE, m, n)
+    donar_vector = np.zeros((POP_SIZE, n))
+    trial_vector =  np.zeros((POP_SIZE, n))
 
+    # Evaluate fitness of the target vector
     fitness_values = np.array([
-        fitness(population[i], C, R, B)
+        fitness(target_vector[i], C, R, B)
         for i in range(POP_SIZE)
     ])
 
-    p_best = population.copy()
-    f_p_best = fitness_values.copy()
-
-    g_best_index = np.argmax(f_p_best)
-    g_best = p_best[g_best_index].copy()
-    f_g_best = f_p_best[g_best_index]
-
-    for _ in range(ITERATIONS):
+    for t in range(ITERATIONS):
 
         for i in range(POP_SIZE):
+            # Generate random number array
+            r1, r2, r3 = np.random.choice(POP_SIZE, 3, replace=False)
 
-            r1 = np.random.rand()
-            r2 = np.random.rand()
+            # Generate Donar Vector (mutation)
+            donar_vector[i] = target_vector[r1] + SCALING_FACTOR * (target_vector[r2] - target_vector[r3])
 
-            # velocity update
-            velocity[i] = (
-                INTERTIA * velocity[i]
-                + C1 * r1 * (p_best[i] - population[i])
-                + C2 * r2 * (g_best - population[i])
-            )
+            # Generate Trial Vector (crossover)
+            del_ = np.random.randint(n)
+            r = np.random.rand()
 
-            # Position update
-            population[i] += velocity[i]
-
+            if r <= CROSSOVER_RATE or i == del_:
+                trial_vector[i] = donar_vector[i]
+            elif r > CROSSOVER_RATE and i != del_:
+                trial_vector[i] = target_vector[i]
+            
+   
+        for i in range(POP_SIZE):
             # Bound
-            population[i] = np.clip(population[i], 0, m - 1)
+            trial_vector[i] = np.clip(trial_vector[i],0 ,m - 1)
 
-            # Fitness
-            fitness_values[i] = fitness(population[i], C, R, B)
+            # Discretize
+            trial_vector[i] = np.round(trial_vector[i])
 
-            # Discretize for evaluation
-            discrete_particle = np.round(population[i])
+            temp = fitness(trial_vector[i],C ,R ,B)
+            if temp > fitness_values[i]:
+                target_vector[i] = trial_vector[i]
+                fitness_values[i] = temp 
+        
 
-            # Personal best
-            fitness_values[i] = fitness(discrete_particle, C, R, B)
-
-            if fitness_values[i] > f_p_best[i]:
-                p_best[i] = discrete_particle.copy()
-                f_p_best[i] = fitness_values[i]
-
-        # Global best update
-        best_index = np.argmax(f_p_best) 
-        if f_p_best[best_index] > f_g_best:
-            g_best = p_best[best_index].copy()
-            f_g_best = f_p_best[best_index]
-
-    return g_best, f_g_best
+    best_index = np.argmax(fitness_values)
+    return target_vector[best_index], fitness_values[best_index]
 
 
 # ================================================================
@@ -168,9 +152,9 @@ def solve_gap_file(filename):
 
         print(f"Instance {idx}:")
 
-        g_best, f_g_best = particle_swarm_optimization(C, R, B)
+        x_best, f_x_best = differential_evolution_based_optimization(C, R, B)
 
-        print(f"  PSO Best Fitness = {f_g_best}")
+        print(f"  DE Best Fitness = {f_x_best}")
 
 
 # ==========================================================

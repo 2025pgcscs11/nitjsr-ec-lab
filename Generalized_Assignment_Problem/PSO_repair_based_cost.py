@@ -30,13 +30,79 @@ def generate_initial_velocity(pop_size, n):
 
 
 # ==========================================================
+# REPAIR PARTICLE USING COST  APPROACH
+# ==========================================================
+def repair_particle_greedy_cost(particle, C, R, B):
+    n = len(C[0])   # number of jobs
+    m = len(C)      # number of agents
+
+    agents = particle.astype(int)
+
+    resource_used = np.zeros(m)
+
+    # Compute initial resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+    # Repair overloaded agents
+    for a in range(m):
+
+        while resource_used[a] > B[a]:
+
+            jobs = [j for j in range(n) if agents[j] == a]
+
+            if not jobs:
+                break
+
+            best_move = None
+            best_gain = -float('inf')
+
+            # Try all jobs assigned to agent a
+            for j in jobs:
+
+                current_profit = C[a][j]
+
+                # Try assigning job j to other agents
+                for b in range(m):
+
+                    if b == a:
+                        continue
+
+                    # Check feasibility
+                    if resource_used[b] + R[b][j] <= B[b]:
+
+                        new_profit = C[b][j]
+                        gain = new_profit - current_profit
+                        # gain = new_profit / R[a][j] - current_profit / R[b][j]
+
+                        if gain > best_gain:
+                            best_gain = gain
+                            best_move = (j, b)
+
+            # Apply best move
+            if best_move is not None:
+                j, new_agent = best_move
+                old_agent = agents[j]
+
+                resource_used[old_agent] -= R[old_agent][j]
+                resource_used[new_agent] += R[new_agent][j]
+
+                agents[j] = new_agent
+            else:
+                # No feasible improvement possible
+                break
+
+    return agents.astype(float)
+
+
+# ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(particle, C, R, B, penalty_weight=1000):
+def fitness(particle, C, R):
     cost = 0
-    penalty = 0
 
-    m = len(B)
+    m = len(C)      # number of Agents
+
     resource_used = [0] * m
 
     agents = particle.astype(int)
@@ -44,27 +110,46 @@ def fitness(particle, C, R, B, penalty_weight=1000):
     for j, agent in enumerate(agents):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
-    
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
 
-    return cost - penalty_weight * penalty
+    return cost
+
+
+# ==========================================================
+# CHECK FEASIBILITY OF EACH particle
+# ==========================================================
+def is_feasible(particle, R, B):
+    m = len(R)        # number of agents
+    n = len(R[0])     # number of jobs
+
+    agents = particle.astype(int)
+
+    resource_used = np.zeros(m)
+
+    # Compute resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+        # Early stopping (optimization)
+        if resource_used[agent] > B[agent]:
+            return False
+
+    return True
 
 
 # ==========================================================
 # PARTICLE SWARM OPTIMIZATION
 # ==========================================================
 def particle_swarm_optimization(C, R, B):
-    m = len(C)      # number of Agents
-    n = len(C[0])   # number of Jobs
+
+    m = len(C)          
+    n = len(C[0])
 
     # Initialize population and velocity
     population = generate_initial_population(POP_SIZE, m, n).astype(float)
     velocity = generate_initial_velocity(POP_SIZE, n)
 
     fitness_values = np.array([
-        fitness(population[i], C, R, B)
+        fitness(population[i], C, R)
         for i in range(POP_SIZE)
     ])
 
@@ -82,7 +167,7 @@ def particle_swarm_optimization(C, R, B):
             r1 = np.random.rand()
             r2 = np.random.rand()
 
-            # velocity update
+            # Velocity update
             velocity[i] = (
                 INTERTIA * velocity[i]
                 + C1 * r1 * (p_best[i] - population[i])
@@ -96,20 +181,27 @@ def particle_swarm_optimization(C, R, B):
             population[i] = np.clip(population[i], 0, m - 1)
 
             # Fitness
-            fitness_values[i] = fitness(population[i], C, R, B)
+            fitness_values[i] = fitness(population[i], C, R)
 
             # Discretize for evaluation
             discrete_particle = np.round(population[i])
 
-            # Personal best
-            fitness_values[i] = fitness(discrete_particle, C, R, B)
+            # Repair a infeasible solution
+            if is_feasible(population[i],R,B):
+                population[i] = discrete_particle
+            else:
+                population[i] = repair_particle_greedy_cost(discrete_particle,C,R,B)
 
+            # Fitness
+            fitness_values[i] = fitness(population[i], C, R)
+
+            # Personal best
             if fitness_values[i] > f_p_best[i]:
-                p_best[i] = discrete_particle.copy()
+                p_best[i] = population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
         # Global best update
-        best_index = np.argmax(f_p_best) 
+        best_index = np.argmax(f_p_best)
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]

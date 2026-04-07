@@ -1,15 +1,14 @@
 # ==========================================================
 # IMPORTS MODULE HERE
 # ==========================================================
-import random
 import os
 import numpy as np
 
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 200
-GENERATIONS = 100
+POP_SIZE = 500
+GENERATIONS = 200
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
@@ -17,34 +16,20 @@ MUTATION_RATE = 0.1
 # INITIAL POPULATION (BINARY ENCODED)
 # ==========================================================
 def generate_initial_population(m, n):
-    # Generate random integers in [0, m-1]
-    population_int = np.random.randint(0, m, size=(POP_SIZE, n))
-    
     # Number of bits needed to represent values up to m-1
     num_bits = int(np.ceil(np.log2(m)))
-    
-    population_bin = []
 
-    for individual in population_int:
-        chromosome = []
-        
-        for value in individual:
-            # Convert integer to fixed-length binary string
-            binary_str = format(value, f'0{num_bits}b')
-            
-            # Append bits to chromosome
-            chromosome.extend([int(bit) for bit in binary_str])
-        
-        population_bin.append(chromosome)
+    # Generate random integers in [0, 1]
+    population = np.random.randint(0, 2, size=(POP_SIZE, num_bits * n))
+   
+    return np.array(population)
 
-    return np.array(population_bin)
 
 # ==========================================================
 # DECODE CHROMOSOME AND EXTRACT AGENTS
 # ==========================================================
 def decode_chromosome(chromosome, m):
     num_bits = int(np.ceil(np.log2(m)))
-    n = len(chromosome) // num_bits
     agents = []
 
     for j in range(len(chromosome) // num_bits):
@@ -55,6 +40,9 @@ def decode_chromosome(chromosome, m):
         for bit in chromosome[start:end]:
             value = (value << 1) | bit
 
+        # Keep within bounds
+        value = value % m
+        # value = min(value, m - 1)
         agents.append(value)
 
     return agents
@@ -63,11 +51,11 @@ def decode_chromosome(chromosome, m):
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(chromosome, C, R, B, penalty_weight=10):
+def fitness(chromosome, C, R, B, penalty_weight=1000):
     cost = 0
     penalty = 0
 
-    m = len(C)
+    m = len(C)      # number of Agents
 
     resource_used = [0] * m
 
@@ -87,25 +75,24 @@ def fitness(chromosome, C, R, B, penalty_weight=10):
 # ==========================================================
 # CHECK FEASIBILITY OF EACH CHROMOSOME
 # ==========================================================
-def feasibility_check(chromosome, R, B):
-    m = len(B)       # number of agents
+# def is_feasible(chromosome, R, B):
+#     m = len(R)        # number of agents
+#     n = len(R[0])     # number of jobs
 
-    agents = decode_chromosome(chromosome, m)
-    usage = [0] * m
+#     agents = decode_chromosome(chromosome, m)
 
-    # ---- Boundry Check ---- 
-    for j, agent in enumerate(agents):  
-        # ---- Boundry Check ----   
-        if agent < 0 or agent >= m:
-            return None
+#     resource_used = np.zeros(m)
 
-        # ---- Capacity check ----
-        usage[agent] += R[agent][j]
-        if usage[agent] > B[agent]:
-            return None
+#     # Compute resource usage
+#     for j, agent in enumerate(agents):
+#         resource_used[agent] += R[agent][j]
 
-    # ✔ Feasible
-    return chromosome
+#         # Early stopping (optimization)
+#         if resource_used[agent] > B[agent]:
+#             return False
+
+#     return True
+
 
 # ==========================================================
 # SELECT A PARENT 
@@ -115,7 +102,7 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
     k = min(k, pop_size)                            # ensure k ≤ pop_size
     if pop_size == 0:
         raise ValueError("Population is empty – cannot select parents.")
-    competitors = random.sample(range(pop_size), k)
+    competitors = np.random.choice(pop_size, k, replace=False)
 
     best_index = competitors[0]
     for idx in competitors[1:]:
@@ -126,19 +113,21 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
             if fitness_values[idx] > fitness_values[best_index]:
                 best_index = idx
 
-    return population[best_index]
+    return population[best_index].copy()
+
 
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
 # ==========================================================
 def crossover(p1, p2):
-    if random.random() < CROSSOVER_RATE:
-        point = random.randint(1, len(p1) - 2)
+    if np.random.rand() < CROSSOVER_RATE:
+        point = np.random.randint(1, len(p1) - 2)
         return (
         np.concatenate((p1[:point], p2[point:])),
         np.concatenate((p2[:point], p1[point:]))
         )
-    return p1[:], p2[:]
+    return p1.copy(), p2.copy()
+
 
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM GENE POINTS)
@@ -160,10 +149,12 @@ def crossover(p1, p2):
 # MUTATION IN A CHROMOSOME (BIT-WISE)
 # ==========================================================
 def mutate(chromosome):
+    chromosome = chromosome.copy()  
     for i in range(len(chromosome)):
-        if random.random() < MUTATION_RATE:
+        if np.random.rand() < MUTATION_RATE:
             chromosome[i] ^= 1
     return chromosome
+
 
 # ==========================================================
 # MUTATION IN A CHROMOSOME (GENE-WISE)
@@ -189,56 +180,62 @@ def mutate(chromosome):
 # ==========================================================
 # BINARY-CODED GENETIC ALGORITHM
 # ==========================================================
-def binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CROSSOVER_RATE, MUTATION_RATE, k):
+def binary_coded_genetic_algorithm(C, R, B):
+    m = len(C)      # number of Agents
+    n = len(C[0])   # number of Jobs
+
     # Generate Initial Population
-    population = generate_initial_population(POP_SIZE,)
+    population = generate_initial_population(m,n)
 
     # Store best chromosome
     best_solution = None
     # Store best chromosome's fitness value
     best_fitness = float('-inf')
 
-    for gen in range(GENERATIONS):
-        new_population = []
+    for _ in range(GENERATIONS):
+        offspring_population = []
 
-        fitness_values = 2
-        # [fitness(chromosome, C, R, B) for chromosome in population]
+        fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
         
+        # CROSSOVER
         for i in range(POP_SIZE // 2):
             p1 = tournament_selection(population, fitness_values)
             p2 = tournament_selection(population, fitness_values)
 
             c1, c2 = crossover(p1, p2)
 
-            c1 = mutate(c1)
-            c2 = mutate(c2)
+            # offsprings are added
+            offspring_population.append(c1)
+            offspring_population.append(c2)
+        
 
-            new_population.append(c1)      # now added
-            new_population.append(c2)      # now added
-            
+        # MUTATION
+        for i in range(POP_SIZE):
+            offspring_population[i] = mutate(offspring_population[i])
+
 
         # Combine parents and offspring
-        combined_population = population + new_population
+        combined_population = list(population) + offspring_population
 
         # Sort all individuals by fitness (descending) and keep the best POP_SIZE
-        # combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
-        # sorted_indices = np.argsort(combined_fitness)[::-1]          # descending order
-        # population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
+        combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
+        sorted_indices = np.argsort(combined_fitness)[::-1] # descending order
+        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
         
         for chrom in population:
-            f = fitness(chrom)
+            f = fitness(chrom,C,R,B)
             if f > best_fitness:
                 best_fitness = f
                 best_solution = chrom
 
-        print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
+        # print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
 
     return best_solution, best_fitness
 
 
-# ===============================================================
+# ================================================================
 # GENERATE COST MATRIX, RESOURCE MATRIX, CAPACITY VECTOR FROM FILE
-# ===============================================================
+# ================================================================
 def read_gap_file(filename):
     instances = []
 
@@ -292,7 +289,7 @@ def solve_gap_file(filename):
         n  = int(np.ceil(np.log2(ub)))
         k  = 3
 
-        best_assignment, best_cost = binary_coded_genetic_algorithm(fitness, lb, ub, POP_SIZE, GENERATIONS, n, CROSSOVER_RATE, MUTATION_RATE, k)
+        best_assignment, best_cost = binary_coded_genetic_algorithm(C, R, B)
 
         print(f"  Genetic Algorithm: Best Cost = {best_cost}")
 
@@ -331,12 +328,19 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 # ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap_sample_data_txt.txt"
+    "gap_sample_data_txt.txt",
     # "gap1.txt",
-    # "gap2.txt", "gap3.txt","gap4.txt",
-    # "gap5.txt","gap6.txt","gap7.txt","gap8.txt",
-    # "gap9.txt","gap10.txt","gap11.txt",    
-    # "gap12.txt"
+    # "gap2.txt", 
+    # "gap3.txt",
+    # "gap4.txt",
+    # "gap5.txt",
+    # "gap6.txt",
+    # "gap7.txt",
+    # "gap8.txt",
+    # "gap9.txt",
+    # "gap10.txt",
+    # "gap11.txt",    
+    "gap12.txt"
 ]
 
 

@@ -1,0 +1,360 @@
+# ==========================================================
+# IMPORTS MODULE HERE
+# ==========================================================
+import os
+import numpy as np
+
+# ==========================================================
+# CONSTANT PARAMETERS
+# ==========================================================
+POP_SIZE = 500
+GENERATIONS = 200
+CROSSOVER_RATE = 0.8
+MUTATION_RATE = 0.1
+DISTRIBUTIOIN_INDEX = 20
+MUTATION_DISTRIBUTION_INDEX = 20
+
+# ==========================================================
+# INITIAL POPULATION (REAL ENCODED)
+# ==========================================================
+def generate_initial_population(m,n):
+    # Generate random integers in [0, m)
+    population = np.random.randint(0, m, size=(POP_SIZE, n))
+   
+    return np.array(population)
+
+
+# ==========================================================
+# REPAIR CHROMOSOME USING RANDOM APPROACH
+# ==========================================================
+def repair_chromosome_random(chromosome,C,R,B):
+    n = len(C[0])   # number of Jobs
+    m = len(C)      # number of Agents
+
+    agents = np.round(chromosome).astype(int)
+
+    resource_used = np.zeros(m)
+
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+    for a in range(m):
+
+        while resource_used[a] > B[a]:
+
+            jobs = [j for j in range(n) if agents[j] == a]
+
+            if not jobs:
+                break
+
+            j = np.random.choice(jobs)
+
+            feasible_agents = []
+
+            for b in range(m):
+
+                if b != a and resource_used[b] + R[b][j] <= B[b]:
+                    feasible_agents.append(b)
+
+            if feasible_agents:
+
+                new_agent = np.random.choice(feasible_agents)
+
+                resource_used[a] -= R[a][j]
+                resource_used[new_agent] += R[new_agent][j]
+
+                agents[j] = new_agent
+
+            else:
+                break
+
+    return agents
+
+
+# ==========================================================
+# FITNESS FUNCTION (Maximization with Penalty)
+# ==========================================================
+def fitness(chromosome, C, R, B):
+    cost = 0
+
+    m = len(C)      # number of Agents
+
+    resource_used = [0] * m
+
+    chromosome = np.round(chromosome).astype(int)
+
+    for j, agent in enumerate(chromosome):
+        cost += C[agent][j]
+        resource_used[agent] += R[agent][j]
+
+    return cost
+
+
+# ==========================================================
+# CHECK FEASIBILITY OF EACH CHROMOSOME
+# ==========================================================
+def is_feasible(chromosome, R, B):
+    m = len(R)        # number of agents
+    n = len(R[0])     # number of jobs
+
+    agents = np.round(chromosome).astype(int)
+    resource_used = np.zeros(m)
+
+    # Compute resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+        # Early stopping (optimization)
+        if resource_used[agent] > B[agent]:
+            return False
+
+    return True
+
+
+# ==========================================================
+# SELECT A PARENT 
+# ==========================================================
+def tournament_selection(population, fitness_values, k=3, minimize=False):
+    pop_size = len(population)                     # use current size
+    k = min(k, pop_size)                           # ensure k ≤ pop_size
+    if pop_size == 0:
+        raise ValueError("Population is empty – cannot select parents.")
+    competitors = np.random.choice(pop_size, k, replace=False)
+
+    best_index = competitors[0]
+    for idx in competitors[1:]:
+        if minimize:
+            if fitness_values[idx] < fitness_values[best_index]:
+                best_index = idx
+        else:
+            if fitness_values[idx] > fitness_values[best_index]:
+                best_index = idx
+
+    return population[best_index]
+
+
+# ==========================================================
+# SIMULATED BINARY CROSSOVER (SBX)
+# ==========================================================
+def crossover(p1, p2, m):
+    # If random number >= crossover rate → children = parents
+    if np.random.rand() >= CROSSOVER_RATE:
+        return p1[:], p2[:]
+
+    child1 = []
+    child2 = []
+
+    for x1, x2 in zip(p1, p2):
+        u = np.random.rand()
+        # Compute beta
+        if u <= 0.5:
+            beta = (2 * u) ** (1.0 / (DISTRIBUTIOIN_INDEX + 1))
+        else:
+            beta = (1 / (2 * (1 - u))) ** (1.0 / (DISTRIBUTIOIN_INDEX + 1))
+
+        # Generate children
+        c1 = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
+        c2 = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
+
+        child1.append(c1)
+        child2.append(c2)
+    
+    # Keep within bounds
+    child1 = np.clip(child1, 0, m-1)
+    child2 = np.clip(child2, 0, m-1)
+
+    return np.array(child1), np.array(child2)
+
+# ==========================================================
+# POLYNOMIAL MUTATION
+# ==========================================================
+def mutate(chromosome,m):
+    chromosome = chromosome.copy()
+
+    if np.random.rand() >= MUTATION_RATE:
+        return chromosome
+    else:
+        for i in range(len(chromosome)):
+            r = np.random.rand()
+            
+            if r < 0.5:
+                delta = (2 * r) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1)) - 1
+            else:
+                delta = 1 - (2 * (1 - r)) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1))
+
+            # Apply mutation
+            chromosome[i] = chromosome[i] + delta * (m - 0)
+
+
+    # Keep within bounds
+    chromosome = np.clip(chromosome, 0, m-1)
+
+    return chromosome
+
+# ==========================================================
+# REAL-CODED GENETIC ALGORITHM
+# ==========================================================
+def real_coded_genetic_algorithm(C, R, B):
+    m = len(C)      # number of Agents
+    n = len(C[0])   # number of Jobs
+
+    # Generate Initial Population
+    population = generate_initial_population(m,n)
+    
+     # Store best chromosome
+    best_solution = None
+    # Store best chromosome's fitness value
+    best_fitness = float('-inf')
+
+    for _ in range(GENERATIONS):
+        offspring_population = []
+
+        fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
+        
+        # CROSSOVER
+        for i in range(POP_SIZE // 2):
+            p1 = tournament_selection(population, fitness_values)
+            p2 = tournament_selection(population, fitness_values)
+
+            c1, c2 = crossover(p1, p2, m)
+
+            # offsprings are added
+            offspring_population.append(c1)
+            offspring_population.append(c2)
+
+        # MUTATION
+        for i in range(POP_SIZE):
+            temp = mutate(offspring_population[i],m)
+            if is_feasible(temp,R,B):
+                offspring_population[i] = temp
+            else:
+                offspring_population[i] = repair_chromosome_random(temp,C,R,B)
+
+        # Combine parents and offspring
+        combined_population = list(population) + offspring_population
+
+        # Sort all individuals by fitness (descending) and keep the best POP_SIZE
+        combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
+        sorted_indices = np.argsort(combined_fitness)[::-1] # descending order
+        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
+        
+        for chrom in population:
+            f = fitness(chrom,C,R,B)
+            if f > best_fitness:
+                best_fitness = f
+                best_solution = chrom
+
+        # print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
+
+    return best_solution, best_fitness
+
+
+# ================================================================
+# GENERATE COST MATRIX, RESOURCE MATRIX, CAPACITY VECTOR FROM FILE
+# ================================================================
+def read_gap_file(filename):
+    instances = []
+
+    with open(filename, 'r') as f:
+        data = list(map(int, f.read().split()))
+
+    idx = 0
+    P = data[idx]
+    idx += 1
+
+    for _ in range(P):
+        m = data[idx]
+        n = data[idx + 1]
+        idx += 2
+
+        # Cost matrix
+        C = []
+        for _ in range(m):
+            C.append(data[idx:idx+n])
+            idx += n
+
+        # Resource matrix
+        R = []
+        for _ in range(m):
+            R.append(data[idx:idx+n])
+            idx += n
+
+        # Capacities
+        B = data[idx:idx+m]
+        idx += m
+
+        instances.append((C, R, B))
+
+    return instances
+
+
+# ==================================================================
+# ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
+# ==================================================================
+def solve_gap_file(filename):
+    instances = read_gap_file(filename)
+    results = []
+
+    print(f"\n===== Solving file: {filename} =====\n")
+
+    for idx, (C, R, B) in enumerate(instances, start=1):
+        print(f"Instance {idx}:")
+
+        best_assignment, best_cost = real_coded_genetic_algorithm(C, R, B)
+
+        print(f"  Genetic Algorithm: Best Cost = {best_cost}")
+
+        results.append({
+            "Genetic Algorithm": (best_assignment, best_cost)
+        })
+
+    return results
+
+
+# ==========================================================
+# ITERATE OVER ALL FILES
+# ==========================================================
+def solve_multiple_files(file_list,base_dir="gap_dataset"):
+    all_results = {}
+    # Absolute path of current script directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Full path to dataset folder
+    dataset_dir = os.path.join(script_dir, base_dir)
+
+    for file in file_list:
+        file_path = os.path.join(dataset_dir,file)
+
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"GAP file not found: {file_path}")
+        
+        all_results[file] = solve_gap_file(file_path)
+
+    return all_results
+
+
+# ==========================================================
+# ALL FILE NAMES
+# ==========================================================
+files = [
+    "gap_sample_data_txt.txt",
+    # "gap1.txt",
+    # "gap2.txt", 
+    # "gap3.txt",
+    # "gap4.txt",
+    # "gap5.txt",
+    # "gap6.txt",
+    # "gap7.txt",
+    # "gap8.txt",
+    # "gap9.txt",
+    # "gap10.txt",
+    # "gap11.txt",
+    "gap12.txt"
+]
+
+
+# ==========================================================
+# EXECUTION STARTS HERE
+# ==========================================================
+if __name__ == "__main__": 
+    solve_multiple_files(files)

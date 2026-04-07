@@ -30,41 +30,91 @@ def generate_initial_velocity(pop_size, n):
 
 
 # ==========================================================
+# GENERATE FEASIBLE SOLUTION
+# ==========================================================
+def generate_feasible_solution(C, R, B):
+    n = len(C[0])
+    m = len(C)
+
+    assignment = np.full(n, -1)
+    resource_used = [0] * m
+
+    # Assign jobs one by one
+    for j in range(n):
+        best_agent = None
+        best_profit = -float('inf')
+
+        for a in range(m):
+            if resource_used[a] + R[a][j] <= B[a]:
+                if C[a][j] > best_profit:
+                    best_profit = C[a][j]
+                    best_agent = a
+
+        if best_agent is not None:
+            assignment[j] = best_agent
+            resource_used[best_agent] += R[best_agent][j]
+        else:
+            # fallback: assign randomly (rare case)
+            assignment[j] = np.random.randint(m)
+
+    return assignment.astype(float)
+
+
+# ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(particle, C, R, B, penalty_weight=1000):
+def fitness(particle, C, R):
     cost = 0
-    penalty = 0
 
-    m = len(B)
+    m = len(C)      # number of Agents
+
     resource_used = [0] * m
+
+    particle = particle.astype(int)
+
+    for j, agent in enumerate(particle):
+        cost += C[agent][j]
+        resource_used[agent] += R[agent][j]
+
+    return cost
+
+
+# ==========================================================
+# CHECK FEASIBILITY OF EACH particle
+# ==========================================================
+def is_feasible(particle, R, B):
+    m = len(R)        # number of agents
+    n = len(R[0])     # number of jobs
 
     agents = particle.astype(int)
 
-    for j, agent in enumerate(agents):
-        cost += C[agent][j]
-        resource_used[agent] += R[agent][j]
-    
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
+    resource_used = np.zeros(m)
 
-    return cost - penalty_weight * penalty
+    # Compute resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+        # Early stopping (optimization)
+        if resource_used[agent] > B[agent]:
+            return False
+
+    return True
 
 
 # ==========================================================
 # PARTICLE SWARM OPTIMIZATION
 # ==========================================================
 def particle_swarm_optimization(C, R, B):
-    m = len(C)      # number of Agents
-    n = len(C[0])   # number of Jobs
+
+    m = len(C)          
+    n = len(C[0])
 
     # Initialize population and velocity
     population = generate_initial_population(POP_SIZE, m, n).astype(float)
     velocity = generate_initial_velocity(POP_SIZE, n)
 
     fitness_values = np.array([
-        fitness(population[i], C, R, B)
+        fitness(population[i], C, R)
         for i in range(POP_SIZE)
     ])
 
@@ -82,7 +132,7 @@ def particle_swarm_optimization(C, R, B):
             r1 = np.random.rand()
             r2 = np.random.rand()
 
-            # velocity update
+            # Velocity update
             velocity[i] = (
                 INTERTIA * velocity[i]
                 + C1 * r1 * (p_best[i] - population[i])
@@ -96,20 +146,27 @@ def particle_swarm_optimization(C, R, B):
             population[i] = np.clip(population[i], 0, m - 1)
 
             # Fitness
-            fitness_values[i] = fitness(population[i], C, R, B)
+            fitness_values[i] = fitness(population[i], C, R)
 
             # Discretize for evaluation
             discrete_particle = np.round(population[i])
 
-            # Personal best
-            fitness_values[i] = fitness(discrete_particle, C, R, B)
+            # Repair a infeasible solution
+            if is_feasible(population[i],R,B):
+                population[i] = discrete_particle
+            else:
+                population[i] = generate_feasible_solution(C,R,B)
 
+            # Fitness
+            fitness_values[i] = fitness(population[i], C, R)
+
+            # Personal best
             if fitness_values[i] > f_p_best[i]:
-                p_best[i] = discrete_particle.copy()
+                p_best[i] = population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
         # Global best update
-        best_index = np.argmax(f_p_best) 
+        best_index = np.argmax(f_p_best)
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]

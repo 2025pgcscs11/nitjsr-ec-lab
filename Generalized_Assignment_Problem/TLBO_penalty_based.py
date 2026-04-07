@@ -9,42 +9,33 @@ import numpy as np
 # ==========================================================
 POP_SIZE = 500
 ITERATIONS = 200
-INTERTIA = 0.7
-C1 = 1.5
-C2 = 1.5
+TEACHING_FACTOR = 2
 
 
 # ==========================================================
 # INITIAL POPULATION
 # ==========================================================
 def generate_initial_population(pop_size, m, n):
-    # Each particle: length n (jobs), values in [0, m-1]
+    # Each student: length n (jobs), values in [0, m-1]
     return np.random.randint(0, m, size=(pop_size, n))
-
-
-# ==========================================================
-# INITIAL VELOCITY
-# ==========================================================
-def generate_initial_velocity(pop_size, n):
-    return np.random.uniform(1, 10, size=(pop_size, n))
 
 
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(particle, C, R, B, penalty_weight=1000):
+def fitness(student, C, R, B, penalty_weight=1000):
     cost = 0
     penalty = 0
 
     m = len(B)
     resource_used = [0] * m
-
-    agents = particle.astype(int)
+    
+    agents = student.astype(int)
 
     for j, agent in enumerate(agents):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
-    
+
     for a in range(m):
         if resource_used[a] > B[a]:
             penalty += (resource_used[a] - B[a])
@@ -53,68 +44,86 @@ def fitness(particle, C, R, B, penalty_weight=1000):
 
 
 # ==========================================================
-# PARTICLE SWARM OPTIMIZATION
+# TEACHING LEARNING BASED OPTIMIZATION
 # ==========================================================
-def particle_swarm_optimization(C, R, B):
+def teaching_learning_based_optimization(C, R, B):
     m = len(C)      # number of Agents
     n = len(C[0])   # number of Jobs
 
-    # Initialize population and velocity
-    population = generate_initial_population(POP_SIZE, m, n).astype(float)
-    velocity = generate_initial_velocity(POP_SIZE, n)
+    # Initialize random population
+    population = generate_initial_population(POP_SIZE, m, n)
 
+    # Evaluate fitness of the population
     fitness_values = np.array([
         fitness(population[i], C, R, B)
         for i in range(POP_SIZE)
     ])
 
-    p_best = population.copy()
-    f_p_best = fitness_values.copy()
-
-    g_best_index = np.argmax(f_p_best)
-    g_best = p_best[g_best_index].copy()
-    f_g_best = f_p_best[g_best_index]
 
     for _ in range(ITERATIONS):
 
         for i in range(POP_SIZE):
+            ##################################
+            #        TEACHING PHASE          #
+            ##################################
 
+            # Generate random number array
             r1 = np.random.rand()
             r2 = np.random.rand()
 
-            # velocity update
-            velocity[i] = (
-                INTERTIA * velocity[i]
-                + C1 * r1 * (p_best[i] - population[i])
-                + C2 * r2 * (g_best - population[i])
+            # Find X_best
+            x_best_index = np.argmax(fitness_values)
+            x_best = population[x_best_index].copy()
+
+            # Determine X_mean
+            x_mean = np.mean(population, axis=0)
+
+            # Calculate x_new
+            x_new = population[i] + r1 * (x_best - TEACHING_FACTOR * x_mean)
+
+            # Bound x_new
+            x_new = np.clip(np.round(x_new),0,m - 1)
+
+            # Calculate fitness of x_new
+            f_x_new = fitness(x_new,C,R,B)
+
+            # Compare with the past fitness
+            if f_x_new > fitness_values[i]:
+                population[i] = x_new.copy()
+                fitness_values[i] = f_x_new
+            
+
+            ##################################
+            #        LEARNER PHASE           #
+            ##################################
+
+            # Select a random partner solution other than current solution and its fitness value
+            x_p_index = np.random.choice(
+                np.delete(np.arange(population.shape[0]), i)
             )
+            x_p = population[x_p_index]
+            f_x_p = fitness_values[x_p_index]
 
-            # Position update
-            population[i] += velocity[i]
+            # Calculate x_new
+            if f_x_p > fitness_values[i]:
+                x_new = population[i] + r2 * (population[i] - x_p)
+            else:
+                x_new = population[i] - r2 * (population[i] - x_p)
 
-            # Bound
-            population[i] = np.clip(population[i], 0, m - 1)
+            # Bound x_new
+            x_new = np.clip(np.round(x_new),0,m - 1)
 
-            # Fitness
-            fitness_values[i] = fitness(population[i], C, R, B)
+            # Calculate fitness of x_new
+            f_x_new = fitness(x_new,C,R,B)
 
-            # Discretize for evaluation
-            discrete_particle = np.round(population[i])
+            # Compare with the past fitness
+            if f_x_new > fitness_values[i]:
+                population[i] = x_new.copy()
+                fitness_values[i] = f_x_new
 
-            # Personal best
-            fitness_values[i] = fitness(discrete_particle, C, R, B)
-
-            if fitness_values[i] > f_p_best[i]:
-                p_best[i] = discrete_particle.copy()
-                f_p_best[i] = fitness_values[i]
-
-        # Global best update
-        best_index = np.argmax(f_p_best) 
-        if f_p_best[best_index] > f_g_best:
-            g_best = p_best[best_index].copy()
-            f_g_best = f_p_best[best_index]
-
-    return g_best, f_g_best
+    best_index = np.argmax(fitness_values)
+    
+    return population[best_index], fitness_values[best_index]
 
 
 # ================================================================
@@ -168,9 +177,9 @@ def solve_gap_file(filename):
 
         print(f"Instance {idx}:")
 
-        g_best, f_g_best = particle_swarm_optimization(C, R, B)
+        x_best, f_x_best = teaching_learning_based_optimization(C, R, B)
 
-        print(f"  PSO Best Fitness = {f_g_best}")
+        print(f"  TLBO Best Fitness = {f_x_best}")
 
 
 # ==========================================================

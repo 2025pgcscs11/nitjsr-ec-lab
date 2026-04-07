@@ -7,8 +7,8 @@ import numpy as np
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 200
-ITERATIONS = 100
+POP_SIZE = 500
+ITERATIONS = 200
 TEACHING_FACTOR = 2
 
 
@@ -21,34 +21,116 @@ def generate_initial_population(pop_size, m, n):
 
 
 # ==========================================================
+# REPAIR STUDENT USING COST  APPROACH
+# ==========================================================
+def repair_student_greedy_cost(student, C, R, B):
+    n = len(C[0])   # number of jobs
+    m = len(C)      # number of agents
+
+    agents = student.astype(int)
+
+    resource_used = np.zeros(m)
+
+    # Compute initial resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+    # Repair overloaded agents
+    for a in range(m):
+
+        while resource_used[a] > B[a]:
+
+            jobs = [j for j in range(n) if agents[j] == a]
+
+            if not jobs:
+                break
+
+            best_move = None
+            best_gain = -float('inf')
+
+            # Try all jobs assigned to agent a
+            for j in jobs:
+
+                current_profit = C[a][j]
+
+                # Try assigning job j to other agents
+                for b in range(m):
+
+                    if b == a:
+                        continue
+
+                    # Check feasibility
+                    if resource_used[b] + R[b][j] <= B[b]:
+
+                        new_profit = C[b][j]
+                        gain = new_profit - current_profit
+                        # gain = new_profit / R[a][j] - current_profit / R[b][j]
+
+                        if gain > best_gain:
+                            best_gain = gain
+                            best_move = (j, b)
+
+            # Apply best move
+            if best_move is not None:
+                j, new_agent = best_move
+                old_agent = agents[j]
+
+                resource_used[old_agent] -= R[old_agent][j]
+                resource_used[new_agent] += R[new_agent][j]
+
+                agents[j] = new_agent
+            else:
+                # No feasible improvement possible
+                break
+
+    return agents
+
+
+# ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(student, C, R, B, penalty_weight=1000):
-
+def fitness(student, C, R, B):
     cost = 0
-    penalty = 0
 
     m = len(B)
     resource_used = [0] * m
+    
+    agents = student.astype(int)
 
-    for j in range(len(student)):
-        # agent = np.clip(int(round(student[j])),0,m-1)  
-        agent = student[j]   
+    for j, agent in enumerate(agents):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
 
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
 
-    return cost - penalty_weight * penalty
+    return
+
+
+# ==========================================================
+# CHECK FEASIBILITY OF EACH student
+# ==========================================================
+def is_feasible(student, R, B):
+    m = len(R)        # number of agents
+    n = len(R[0])     # number of jobs
+
+    agents = student.astype(int)
+
+    resource_used = np.zeros(m)
+
+    # Compute resource usage
+    for j, agent in enumerate(agents):
+        resource_used[agent] += R[agent][j]
+
+        # Early stopping (optimization)
+        if resource_used[agent] > B[agent]:
+            return False
+
+    return True
 
 
 # ==========================================================
 # TEACHING LEARNING BASED OPTIMIZATION
 # ==========================================================
 def teaching_learning_based_optimization(C, R, B):
-
     m = len(C)      # number of Agents
     n = len(C[0])   # number of Jobs
 
@@ -62,7 +144,7 @@ def teaching_learning_based_optimization(C, R, B):
     ])
 
 
-    for t in range(ITERATIONS):
+    for _ in range(ITERATIONS):
 
         for i in range(POP_SIZE):
             ##################################
@@ -84,7 +166,14 @@ def teaching_learning_based_optimization(C, R, B):
             x_new = population[i] + r1 * (x_best - TEACHING_FACTOR * x_mean)
 
             # Bound x_new
-            x_new = np.clip(np.round(x_new),0,m - 1).astype(int)
+            x_new = np.clip(x_new,0,m - 1)
+
+            # Discretize
+            x_new = np.round(x_new)
+            
+            # Repair if not feasible
+            if not is_feasible(x_new,R,B):
+                x_new = repair_student_greedy_cost(x_new,C,R,B)
 
             # Calculate fitness of x_new
             f_x_new = fitness(x_new,C,R,B)
@@ -107,14 +196,20 @@ def teaching_learning_based_optimization(C, R, B):
             f_x_p = fitness_values[x_p_index]
 
             # Calculate x_new
-
             if f_x_p > fitness_values[i]:
                 x_new = population[i] + r2 * (population[i] - x_p)
             else:
                 x_new = population[i] - r2 * (population[i] - x_p)
 
             # Bound x_new
-            x_new = np.clip(np.round(x_new),0,m - 1).astype(int)
+            x_new = np.clip(x_new,0,m - 1)
+
+            # Discretize
+            x_new = np.round(x_new)
+
+            # Repair if not feasible
+            if not is_feasible(x_new,R,B):
+                x_new = repair_student_greedy_cost(x_new,C,R,B)
 
             # Calculate fitness of x_new
             f_x_new = fitness(x_new,C,R,B)
@@ -124,14 +219,14 @@ def teaching_learning_based_optimization(C, R, B):
                 population[i] = x_new.copy()
                 fitness_values[i] = f_x_new
 
-
     best_index = np.argmax(fitness_values)
+    
     return population[best_index], fitness_values[best_index]
 
 
-# ==========================================================
-# READ GAP FILE
-# ==========================================================
+# ================================================================
+# GENERATE COST MATRIX, RESOURCE MATRIX, CAPACITY VECTOR FROM FILE
+# ================================================================
 def read_gap_file(filename):
 
     instances = []
@@ -167,9 +262,9 @@ def read_gap_file(filename):
     return instances
 
 
-# ==========================================================
-# SOLVE FILE
-# ==========================================================
+# ==================================================================
+# ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
+# ==================================================================
 def solve_gap_file(filename):
 
     instances = read_gap_file(filename)
@@ -186,7 +281,7 @@ def solve_gap_file(filename):
 
 
 # ==========================================================
-# MULTIPLE FILES
+# ITERATE OVER ALL FILES
 # ==========================================================
 def solve_multiple_files(file_list, base_dir="gap_dataset"):
 
@@ -204,10 +299,10 @@ def solve_multiple_files(file_list, base_dir="gap_dataset"):
 
 
 # ==========================================================
-# MAIN
+# ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap_sample_data_txt.txt"
+    "gap_sample_data_txt.txt",
     # "gap1.txt",
     # "gap2.txt",
     # "gap3.txt",
@@ -219,8 +314,12 @@ files = [
     # "gap9.txt",
     # "gap10.txt",
     # "gap11.txt",
-    # "gap12.txt",
+    "gap12.txt",
 ]
 
-if __name__ == "__main__":
+
+# ==========================================================
+# EXECUTION STARTS HERE
+# ==========================================================
+if __name__ == "__main__": 
     solve_multiple_files(files)
