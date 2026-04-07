@@ -284,11 +284,6 @@ def solve_gap_file(filename):
     for idx, (C, R, B) in enumerate(instances, start=1):
         print(f"Instance {idx}:")
 
-        lb = 0
-        ub = len(C[0]) - 1
-        n  = int(np.ceil(np.log2(ub)))
-        k  = 3
-
         best_assignment, best_cost = binary_coded_genetic_algorithm(C, R, B)
 
         print(f"  Genetic Algorithm: Best Cost = {best_cost}")
