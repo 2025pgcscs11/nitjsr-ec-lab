@@ -3,6 +3,8 @@
 # ==========================================================
 import os
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
 # ==========================================================
 # CONSTANT PARAMETERS
@@ -155,6 +157,7 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
 
     return population[best_index].copy()
 
+
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
 # ==========================================================
@@ -228,11 +231,14 @@ def binary_coded_genetic_algorithm(C, R, B):
     best_solution = None
     # Store best chromosome's fitness value
     best_fitness = float('-inf')
+     # Best Fitness per generation
+    best_fitness_per_gen = []
+
+    # Evaluate fitness values
+    fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
 
     for _ in range(GENERATIONS):
         offspring_population = []
-
-        fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
         
         # CROSSOVER
         for i in range(POP_SIZE // 2):
@@ -247,7 +253,7 @@ def binary_coded_genetic_algorithm(C, R, B):
         
 
         # MUTATION  and replacement based feasibility check
-        for i in range(POP_SIZE):
+        for i in range(len(offspring_population)):
             temp = mutate(offspring_population[i])
             if is_feasible(temp,R,B):
                 offspring_population[i] = temp
@@ -256,24 +262,32 @@ def binary_coded_genetic_algorithm(C, R, B):
                 offspring_population[i] = feasible_solution
 
 
-        # Combine parents and offspring
+        # Evaluate offspring fitness 
+        offspring_fitness = [fitness(ind, C, R, B) for ind in offspring_population]
+
+        # Combine
         combined_population = list(population) + offspring_population
+        combined_fitness = list(fitness_values) + offspring_fitness
 
-        # Sort all individuals by fitness (descending) and keep the best POP_SIZE
-        combined_fitness = [fitness(ind, C, R, B) for ind in combined_population]
-        sorted_indices = np.argsort(combined_fitness)[::-1] # descending order
+        # Sort
+        sorted_indices = np.argsort(combined_fitness)[::-1]
+
+        # Select next generation
         population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        
-        for chrom in population:
-            f = fitness(chrom,C,R,B)
-            if f > best_fitness:
-                best_fitness = f
-                best_solution = chrom
+        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
 
-        # print(f"Generation {gen+1}: Best Fitness = {best_fitness}")
+        # Best of this generation
+        gen_best_fitness = combined_fitness[sorted_indices[0]]
+        best_fitness_per_gen.append(gen_best_fitness)
 
-    return best_solution, best_fitness
+        # Update global best
+        if gen_best_fitness > best_fitness:
+            best_fitness = gen_best_fitness
+            best_solution = population[0]
 
+        # print(f"Generation {gen+1}: Best Fitness = {gen_best_fitness}")
+
+    return best_solution, best_fitness, best_fitness_per_gen
 
 # ================================================================
 # GENERATE COST MATRIX, RESOURCE MATRIX, CAPACITY VECTOR FROM FILE
@@ -324,14 +338,64 @@ def solve_gap_file(filename):
     print(f"\n===== Solving file: {filename} =====\n")
 
     for idx, (C, R, B) in enumerate(instances, start=1):
-        print(f"Instance {idx}:")
+        print(f"\nInstance {idx}:")
 
-        best_assignment, best_cost = binary_coded_genetic_algorithm(C, R, B)
+        num_runs = 20
+        all_histories = []
+        all_best_sol = []
+        all_best_costs = []
+        all_times = []
 
-        print(f"  Genetic Algorithm: Best Cost = {best_cost}")
+        # Run GA multiple times
+        for run in range(num_runs):
+            start_time = time.perf_counter()
 
+            best_assignment, best_cost, fitness_per_gen = binary_coded_genetic_algorithm(C, R, B)
+
+            end_time = time.perf_counter()
+
+            run_time = end_time - start_time
+
+            all_histories.append(fitness_per_gen)
+            all_best_sol.append(best_assignment)
+            all_best_costs.append(best_cost)
+            all_times.append(run_time)
+
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+
+        # Convert to numpy array for easier computation
+        all_histories = np.array(all_histories)
+
+        # Compute average convergence
+        avg_fitness = np.mean(all_histories, axis=0)
+
+        # ==========================
+        # Plot for THIS instance
+        # ==========================
+        plt.figure()
+
+        # Plot all runs (light)
+        for i, history in enumerate(all_histories):
+            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+
+        # Plot average (bold)
+        plt.plot(avg_fitness, linewidth=2, label="Average")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Best Fitness")
+        plt.title(f"CONVERGENCE PLOT || BCGA(replacement based) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.show()
+
+        # Store results
         results.append({
-            "Genetic Algorithm": (best_assignment, best_cost)
+            "histories": all_histories,
+            "best_costs": all_best_costs,
+            "avg_fitness": avg_fitness
         })
 
     return results

@@ -3,6 +3,8 @@
 # ==========================================================
 import os
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
 # ==========================================================
 # CONSTANT PARAMETERS
@@ -75,6 +77,9 @@ def particle_swarm_optimization(C, R, B):
     g_best = p_best[g_best_index].copy()
     f_g_best = f_p_best[g_best_index]
 
+    # Best Fitness per iteration
+    best_fitness_per_gen = []
+
     for _ in range(ITERATIONS):
 
         for i in range(POP_SIZE):
@@ -113,8 +118,13 @@ def particle_swarm_optimization(C, R, B):
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
+        
+        # Best Fitness of this iteration
+        best_fitness_per_gen.append(f_g_best)
 
-    return g_best, f_g_best
+        # print(f"Generation {gen+1}: Best Fitness = {f_g_best}")
+
+    return g_best, f_g_best, best_fitness_per_gen
 
 
 # ================================================================
@@ -159,18 +169,73 @@ def read_gap_file(filename):
 # ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
 # ==================================================================
 def solve_gap_file(filename):
-
     instances = read_gap_file(filename)
+    results = []
 
     print(f"\n===== Solving file: {filename} =====\n")
 
     for idx, (C, R, B) in enumerate(instances, start=1):
+        print(f"\nInstance {idx}:")
 
-        print(f"Instance {idx}:")
+        num_runs = 20
+        all_histories = []
+        all_best_sol = []
+        all_best_costs = []
+        all_times = []
 
-        g_best, f_g_best = particle_swarm_optimization(C, R, B)
+        # Run GA multiple times
+        for run in range(num_runs):
+            start_time = time.perf_counter()
 
-        print(f"  PSO Best Fitness = {f_g_best}")
+            best_assignment, best_cost, fitness_per_gen = particle_swarm_optimization(C, R, B)
+
+            end_time = time.perf_counter()
+
+            run_time = end_time - start_time
+
+            all_histories.append(fitness_per_gen)
+            all_best_sol.append(best_assignment)
+            all_best_costs.append(best_cost)
+            all_times.append(run_time)
+
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+
+        # Convert to numpy array for easier computation
+        all_histories = np.array(all_histories)
+
+        # Compute average convergence
+        avg_fitness = np.mean(all_histories, axis=0)
+
+        # ==========================
+        # Plot for THIS instance
+        # ==========================
+        plt.figure()
+
+        # Plot all runs (light)
+        for i, history in enumerate(all_histories):
+            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+
+        # Plot average (bold)
+        plt.plot(avg_fitness, linewidth=2, label="Average")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Best Fitness")
+        plt.title(f"CONVERGENCE PLOT || PSO(penalty based) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.show()
+
+        # Store results
+        results.append({
+            "histories": all_histories,
+            "best_costs": all_best_costs,
+            "avg_fitness": avg_fitness
+        })
+
+    return results
 
 
 # ==========================================================
