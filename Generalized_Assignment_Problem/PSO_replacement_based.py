@@ -3,6 +3,8 @@
 # ==========================================================
 import os
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
 # ==========================================================
 # CONSTANT PARAMETERS
@@ -105,34 +107,37 @@ def is_feasible(particle, R, B):
 # PARTICLE SWARM OPTIMIZATION
 # ==========================================================
 def particle_swarm_optimization(C, R, B):
-
-    m = len(C)          
-    n = len(C[0])
+    m = len(C)      # number of Agents
+    n = len(C[0])   # number of Jobs
 
     # Initialize population and velocity
     population = generate_initial_population(POP_SIZE, m, n).astype(float)
     velocity = generate_initial_velocity(POP_SIZE, n)
 
     fitness_values = np.array([
-        fitness(population[i], C, R)
+        fitness(np.round(population[i]), C, R, B)
         for i in range(POP_SIZE)
     ])
 
     p_best = population.copy()
     f_p_best = fitness_values.copy()
 
+    # Initialize global best (still needed for velocity update)
     g_best_index = np.argmax(f_p_best)
     g_best = p_best[g_best_index].copy()
     f_g_best = f_p_best[g_best_index]
 
-    for _ in range(ITERATIONS):
+    # Best Fitness per iteration (ONLY iteration best)
+    best_fitness_per_gen = []
+
+    for gen in range(ITERATIONS):
 
         for i in range(POP_SIZE):
 
             r1 = np.random.rand()
             r2 = np.random.rand()
 
-            # Velocity update
+            # velocity update
             velocity[i] = (
                 INTERTIA * velocity[i]
                 + C1 * r1 * (p_best[i] - population[i])
@@ -145,33 +150,37 @@ def particle_swarm_optimization(C, R, B):
             # Bound
             population[i] = np.clip(population[i], 0, m - 1)
 
-            # Fitness
-            fitness_values[i] = fitness(population[i], C, R)
-
             # Discretize for evaluation
             discrete_particle = np.round(population[i])
 
-            # Repair a infeasible solution
-            if is_feasible(population[i],R,B):
+            # Replace a infeasible solution
+            if is_feasible(discrete_particle,R,B):
                 population[i] = discrete_particle
             else:
                 population[i] = generate_feasible_solution(C,R,B)
 
             # Fitness
-            fitness_values[i] = fitness(population[i], C, R)
+            fitness_values[i] = fitness(discrete_particle, C, R, B)
 
-            # Personal best
+            # Personal best update
             if fitness_values[i] > f_p_best[i]:
-                p_best[i] = population[i].copy()
+                p_best[i] = discrete_particle.copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Global best update
+        # Iteration best
+        current_best = np.max(fitness_values)
+        best_fitness_per_gen.append(current_best)
+
+        # print(f"Generation {gen+1}: Iteration Best = {current_best}")
+
+        # Global best update 
         best_index = np.argmax(f_p_best)
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
 
-    return g_best, f_g_best
+
+    return g_best, f_g_best, best_fitness_per_gen
 
 
 # ================================================================
@@ -216,36 +225,96 @@ def read_gap_file(filename):
 # ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
 # ==================================================================
 def solve_gap_file(filename):
-
     instances = read_gap_file(filename)
+    results = []
 
     print(f"\n===== Solving file: {filename} =====\n")
 
     for idx, (C, R, B) in enumerate(instances, start=1):
+        print(f"\nInstance {idx}:")
 
-        print(f"Instance {idx}:")
+        num_runs = 20
+        all_histories = []
+        all_best_sol = []
+        all_best_costs = []
+        all_times = []
 
-        g_best, f_g_best = particle_swarm_optimization(C, R, B)
+        # Run GA multiple times
+        for run in range(num_runs):
+            start_time = time.perf_counter()
 
-        print(f"  PSO Best Fitness = {f_g_best}")
+            best_assignment, best_cost, fitness_per_gen = particle_swarm_optimization(C, R, B)
 
+            end_time = time.perf_counter()
+
+            run_time = end_time - start_time
+
+            all_histories.append(fitness_per_gen)
+            all_best_sol.append(best_assignment)
+            all_best_costs.append(best_cost)
+            all_times.append(run_time)
+
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+
+        # Convert to numpy array for easier computation
+        all_histories = np.array(all_histories)
+
+        # Compute average convergence
+        avg_fitness = np.mean(all_histories, axis=0)
+
+        # ==========================
+        # Plot for THIS instance
+        # ==========================
+        plt.figure()
+
+        # Plot all runs (light)
+        for i, history in enumerate(all_histories):
+            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+
+        # Plot average (bold)
+        plt.plot(avg_fitness, linewidth=2, label="Average")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Best Fitness")
+        plt.title(f"CONVERGENCE PLOT || PSO(replacement based) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_PSO_replacement_convergence.png", dpi=300)
+        plt.show()
+
+        # Store results
+        results.append({
+            "histories": all_histories,
+            "best_costs": all_best_costs,
+            "avg_fitness": avg_fitness
+        })
+
+    return results
 
 # ==========================================================
 # ITERATE OVER ALL FILES
 # ==========================================================
-def solve_multiple_files(file_list, base_dir="gap_dataset"):
-
+def solve_multiple_files(file_list,base_dir="gap_dataset"):
+    all_results = {}
+    
+    # Absolute path of current script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Full path to dataset folder
     dataset_dir = os.path.join(script_dir, base_dir)
 
     for file in file_list:
-
-        file_path = os.path.join(dataset_dir, file)
+        file_path = os.path.join( dataset_dir,file)
+        file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
+        
+        all_results[file] = solve_gap_file(file_path)
 
-        solve_gap_file(file_path)
+    return all_results
 
 
 # ==========================================================

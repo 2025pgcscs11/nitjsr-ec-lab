@@ -43,23 +43,30 @@ def fitness(solution):
 # ==========================================================
 def differential_evolution_based_optimization():
     # Initialize random target vector
-    target_vector = generate_initial_population(POP_SIZE,DIMENSION)
+    target_vector = generate_initial_population(POP_SIZE, DIMENSION)
 
     # Store best solution
     best_solution = None
     # Store best solution's fitness value
     best_fitness = float('inf')
-    # Best Fitness per generation
+    # Best Fitness per generation (iteration best)
     best_fitness_per_gen = []
 
     donar_vector = np.zeros((POP_SIZE, DIMENSION))
-    trial_vector =  np.zeros((POP_SIZE, DIMENSION))
+    trial_vector = np.zeros((POP_SIZE, DIMENSION))
 
     # Evaluate fitness of the target vector
     fitness_values = np.array([
         fitness(target_vector[i])
         for i in range(POP_SIZE)
     ])
+
+    # ==========================
+    # Initialize global best
+    # ==========================
+    best_index = np.argmin(fitness_values)
+    best_solution = target_vector[best_index].copy()
+    best_fitness = fitness_values[best_index]
 
     for t in range(ITERATIONS):
 
@@ -70,41 +77,41 @@ def differential_evolution_based_optimization():
             # Generate Donar Vector (mutation)
             donar_vector[i] = target_vector[r1] + SCALING_FACTOR * (target_vector[r2] - target_vector[r3])
 
-            # Generate Trial Vector (crossover)
+            # Generate Trial Vector 
             del_ = np.random.randint(DIMENSION)
-            r = np.random.rand()
 
-            if r <= CROSSOVER_RATE or i == del_:
-                trial_vector[i] = donar_vector[i]
-            elif r > CROSSOVER_RATE and i != del_:
-                trial_vector[i] = target_vector[i]
+            for j in range(DIMENSION):
+                if np.random.rand() <= CROSSOVER_RATE or j == del_:
+                    trial_vector[i][j] = donar_vector[i][j]
+                else:
+                    trial_vector[i][j] = target_vector[i][j]
 
-            # Store best solution in generation    
-            gen_best_solution = None
-            # Store best fitness in generation    
-            gen_best_fitness = float('inf')
-        
-            for j in range(POP_SIZE):
-                # Bound
-                trial_vector[j] = np.clip(trial_vector[j],LOWER_BOUND, UPPER_BOUND)
+            # Bound
+            trial_vector[i] = np.clip(trial_vector[i], LOWER_BOUND, UPPER_BOUND)
 
-                temp = fitness(trial_vector[j])
-                if temp < fitness_values[j]:
-                    target_vector[j] = trial_vector[j]
-                    fitness_values[j] = temp
+            # Selection
+            temp = fitness(trial_vector[i])
+            if temp < fitness_values[i]:
+                target_vector[i] = trial_vector[i].copy()
+                fitness_values[i] = temp
 
-        gen_best_fitness_index = np.argmin(fitness_values)
-        gen_best_solution = target_vector[gen_best_fitness_index]
-        gen_best_fitness = fitness_values[gen_best_fitness_index]
+
+        # Iteration best (current population)
+        gen_best_index = np.argmin(fitness_values)
+        gen_best_solution = target_vector[gen_best_index]
+        gen_best_fitness = fitness_values[gen_best_index]
+
         best_fitness_per_gen.append(gen_best_fitness)
-                    
-            # print(f"Iteration {t+1}: Best Fitness = {gen_best_fitness}")
- 
-    best_index = np.argmax(fitness_values)
-    best_fitness = fitness_values[best_index]
-    best_solution = target_vector[best_index]
 
-    return best_solution, best_fitness ,best_fitness_per_gen
+        # Global best update
+
+        if gen_best_fitness < best_fitness:
+            best_fitness = gen_best_fitness
+            best_solution = gen_best_solution.copy()
+
+        # print(f"Iteration {t+1}: Best Fitness = {gen_best_fitness}")
+
+    return best_solution, best_fitness, best_fitness_per_gen
 
 
 # ==================================================================
@@ -142,9 +149,7 @@ def solve_square_function():
         # Compute average convergence
         avg_fitness = np.mean(all_histories, axis=0)
 
-        # ==========================
         # Plot for THIS instance
-        # ==========================
         plt.figure()
 
         # Plot all runs (light)
@@ -156,12 +161,12 @@ def solve_square_function():
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || DE(penalty based)")
+        plt.title(f"CONVERGENCE PLOT || DE")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        # plt.savefig(f"plots/_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/DE_convergence.png", dpi=300)
         plt.show()
 
         # Store results

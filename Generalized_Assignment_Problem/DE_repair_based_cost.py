@@ -4,6 +4,8 @@
 # ==========================================================
 import os
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
 # ==========================================================
 # CONSTANT PARAMETERS
@@ -141,13 +143,21 @@ def differential_evolution_based_optimization(C, R, B):
     # Initialize random target vector
     target_vector = generate_initial_population(POP_SIZE, m, n)
     donar_vector = np.zeros((POP_SIZE, n))
-    trial_vector =  np.zeros((POP_SIZE, n))
+    trial_vector = np.zeros((POP_SIZE, n))
 
     # Evaluate fitness of the target vector
     fitness_values = np.array([
         fitness(target_vector[i], C, R, B)
         for i in range(POP_SIZE)
     ])
+
+    # Initialize global best
+    best_index = np.argmax(fitness_values)
+    g_best = target_vector[best_index].copy()
+    f_g_best = fitness_values[best_index]
+
+    # Store iteration best
+    best_fitness_per_gen = []
 
     for t in range(ITERATIONS):
 
@@ -162,31 +172,42 @@ def differential_evolution_based_optimization(C, R, B):
             del_ = np.random.randint(n)
             r = np.random.rand()
 
-            if r <= CROSSOVER_RATE or i == del_:
-                trial_vector[i] = donar_vector[i]
-            elif r > CROSSOVER_RATE and i != del_:
-                trial_vector[i] = target_vector[i]
-            
-        
+            for j in range(n):
+                if np.random.rand() <= CROSSOVER_RATE or j == del_:
+                    trial_vector[i][j] = donar_vector[i][j]
+                else:
+                    trial_vector[i][j] = target_vector[i][j]
+
         for i in range(POP_SIZE):
             # Bound
-            trial_vector[i] = np.clip(trial_vector[i],0 ,m - 1)
+            trial_vector[i] = np.clip(trial_vector[i], 0, m - 1)
 
             # Discretize
             trial_vector[i] = np.round(trial_vector[i])
 
-            # Repair if not feasible
+            # Repair infeasible solution
             if not is_feasible(trial_vector[i],R,B):
                 trial_vector[i] = repair_trial_greedy_cost(trial_vector[i],C,R,B)
-            
-            temp = fitness(trial_vector[i],C ,R ,B)
+
+            # Selection
+            temp = fitness(trial_vector[i], C, R, B)
             if temp > fitness_values[i]:
                 target_vector[i] = trial_vector[i]
                 fitness_values[i] = temp 
-        
 
-    best_index = np.argmax(fitness_values)
-    return target_vector[best_index], fitness_values[best_index]
+        # Iteration best
+        iteration_best = np.max(fitness_values)
+        best_fitness_per_gen.append(iteration_best)
+
+        # Global best update
+        best_index = np.argmax(fitness_values)
+        if fitness_values[best_index] > f_g_best:
+            g_best = target_vector[best_index].copy()
+            f_g_best = fitness_values[best_index]
+
+        # print(f"Iteration {t+1}: Iteration Best = {iteration_best}, Global Best = {f_g_best}")
+
+    return g_best, f_g_best, best_fitness_per_gen
 
 
 # ================================================================
@@ -231,36 +252,97 @@ def read_gap_file(filename):
 # ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
 # ==================================================================
 def solve_gap_file(filename):
-
     instances = read_gap_file(filename)
+    results = []
 
     print(f"\n===== Solving file: {filename} =====\n")
 
     for idx, (C, R, B) in enumerate(instances, start=1):
+        print(f"\nInstance {idx}:")
 
-        print(f"Instance {idx}:")
+        num_runs = 20
+        all_histories = []
+        all_best_sol = []
+        all_best_costs = []
+        all_times = []
 
-        x_best, f_x_best = differential_evolution_based_optimization(C, R, B)
+        # Run GA multiple times
+        for run in range(num_runs):
+            start_time = time.perf_counter()
 
-        print(f"  DE Best Fitness = {f_x_best}")
+            best_assignment, best_cost, fitness_per_gen = differential_evolution_based_optimization(C, R, B)
+
+            end_time = time.perf_counter()
+
+            run_time = end_time - start_time
+
+            all_histories.append(fitness_per_gen)
+            all_best_sol.append(best_assignment)
+            all_best_costs.append(best_cost)
+            all_times.append(run_time)
+
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+
+        # Convert to numpy array for easier computation
+        all_histories = np.array(all_histories)
+
+        # Compute average convergence
+        avg_fitness = np.mean(all_histories, axis=0)
+
+        # ==========================
+        # Plot for THIS instance
+        # ==========================
+        plt.figure()
+
+        # Plot all runs (light)
+        for i, history in enumerate(all_histories):
+            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+
+        # Plot average (bold)
+        plt.plot(avg_fitness, linewidth=2, label="Average")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Best Fitness")
+        plt.title(f"CONVERGENCE PLOT || DE(repair based using cost) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_DE_repair_cost_convergence.png", dpi=300)
+        plt.show()
+
+        # Store results
+        results.append({
+            "histories": all_histories,
+            "best_costs": all_best_costs,
+            "avg_fitness": avg_fitness
+        })
+
+    return results
 
 
 # ==========================================================
 # ITERATE OVER ALL FILES
 # ==========================================================
-def solve_multiple_files(file_list, base_dir="gap_dataset"):
-
+def solve_multiple_files(file_list,base_dir="gap_dataset"):
+    all_results = {}
+    
+    # Absolute path of current script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Full path to dataset folder
     dataset_dir = os.path.join(script_dir, base_dir)
 
     for file in file_list:
-
-        file_path = os.path.join(dataset_dir, file)
+        file_path = os.path.join( dataset_dir,file)
+        file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
+        
+        all_results[file] = solve_gap_file(file_path)
 
-        solve_gap_file(file_path)
+    return all_results
 
 
 # ==========================================================

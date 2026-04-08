@@ -380,7 +380,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_RCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_RCGA_repair_cost_convergence.png", dpi=300)
         plt.show()
 
         # Store results

@@ -66,21 +66,22 @@ def particle_swarm_optimization(C, R, B):
     velocity = generate_initial_velocity(POP_SIZE, n)
 
     fitness_values = np.array([
-        fitness(population[i], C, R, B)
+        fitness(np.round(population[i]), C, R, B)
         for i in range(POP_SIZE)
     ])
 
     p_best = population.copy()
     f_p_best = fitness_values.copy()
 
+    # Initialize global best (still needed for velocity update)
     g_best_index = np.argmax(f_p_best)
     g_best = p_best[g_best_index].copy()
     f_g_best = f_p_best[g_best_index]
 
-    # Best Fitness per iteration
+    # Best Fitness per iteration (ONLY iteration best)
     best_fitness_per_gen = []
 
-    for _ in range(ITERATIONS):
+    for gen in range(ITERATIONS):
 
         for i in range(POP_SIZE):
 
@@ -100,29 +101,29 @@ def particle_swarm_optimization(C, R, B):
             # Bound
             population[i] = np.clip(population[i], 0, m - 1)
 
-            # Fitness
-            fitness_values[i] = fitness(population[i], C, R, B)
-
             # Discretize for evaluation
             discrete_particle = np.round(population[i])
 
-            # Personal best
+            # Fitness
             fitness_values[i] = fitness(discrete_particle, C, R, B)
 
+            # Personal best update
             if fitness_values[i] > f_p_best[i]:
                 p_best[i] = discrete_particle.copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Global best update
-        best_index = np.argmax(f_p_best) 
+        # Iteration best
+        current_best = np.max(fitness_values)
+        best_fitness_per_gen.append(current_best)
+
+        # print(f"Generation {gen+1}: Iteration Best = {current_best}")
+
+        # Global best update 
+        best_index = np.argmax(f_p_best)
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
-        
-        # Best Fitness of this iteration
-        best_fitness_per_gen.append(f_g_best)
 
-        # print(f"Generation {gen+1}: Best Fitness = {f_g_best}")
 
     return g_best, f_g_best, best_fitness_per_gen
 
@@ -225,7 +226,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_PSO_penalty_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -241,19 +242,25 @@ def solve_gap_file(filename):
 # ==========================================================
 # ITERATE OVER ALL FILES
 # ==========================================================
-def solve_multiple_files(file_list, base_dir="gap_dataset"):
-
+def solve_multiple_files(file_list,base_dir="gap_dataset"):
+    all_results = {}
+    
+    # Absolute path of current script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Full path to dataset folder
     dataset_dir = os.path.join(script_dir, base_dir)
 
     for file in file_list:
-
-        file_path = os.path.join(dataset_dir, file)
+        file_path = os.path.join( dataset_dir,file)
+        file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
+        
+        all_results[file] = solve_gap_file(file_path)
 
-        solve_gap_file(file_path)
+    return all_results
 
 
 # ==========================================================

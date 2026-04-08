@@ -37,20 +37,12 @@ def fitness(solution):
     return cost
 
 
-
 # ==========================================================
 # TEACHING LEARNING BASED OPTIMIZATION
 # ==========================================================
 def teaching_learning_based_optimization():
     # Initialize random population
-    population = generate_initial_population(POP_SIZE,DIMENSION)
-
-    # Store best solution
-    best_solution = None
-    # Store best solution's fitness value
-    best_fitness = float('inf')
-    # Best Fitness per generation
-    best_fitness_per_gen = []
+    population = generate_initial_population(POP_SIZE, DIMENSION)
 
     # Evaluate fitness of the population
     fitness_values = np.array([
@@ -58,85 +50,88 @@ def teaching_learning_based_optimization():
         for i in range(POP_SIZE)
     ])
 
+    # ==========================
+    # Global best initialization
+    # ==========================
+    best_index = np.argmin(fitness_values)
+    best_solution = population[best_index].copy()
+    best_fitness = fitness_values[best_index]
+
+    # Best Fitness per generation (iteration best)
+    best_fitness_per_gen = []
 
     for t in range(ITERATIONS):
 
         for i in range(POP_SIZE):
+
             ##################################
             #        TEACHING PHASE          #
             ##################################
 
-            # Generate random number array
             r1 = np.random.rand()
             r2 = np.random.rand()
 
-            # Find X_best
-            x_best_index = np.argmax(fitness_values)
+            # Teacher (best solution in current population)
+            x_best_index = np.argmin(fitness_values)
             x_best = population[x_best_index].copy()
 
-            # Determine X_mean
+            # Mean of population
             x_mean = np.mean(population, axis=0)
 
-            # Calculate x_new
+            # Generate new solution
             x_new = population[i] + r1 * (x_best - TEACHING_FACTOR * x_mean)
+            x_new = np.clip(np.round(x_new), LOWER_BOUND, UPPER_BOUND)
 
-            # Bound x_new
-            x_new = np.clip(np.round(x_new),LOWER_BOUND,UPPER_BOUND)
-
-            # Calculate fitness of x_new
             f_x_new = fitness(x_new)
 
-            # Compare with the past fitness
+            # Greedy selection
             if f_x_new < fitness_values[i]:
                 population[i] = x_new.copy()
                 fitness_values[i] = f_x_new
-            
 
             ##################################
             #        LEARNER PHASE           #
             ##################################
 
-            # Select a random partner solution other than current solution and its fitness value
+            # Select random partner
             x_p_index = np.random.choice(
                 np.delete(np.arange(population.shape[0]), i)
             )
             x_p = population[x_p_index]
             f_x_p = fitness_values[x_p_index]
 
-            # Calculate x_new
+            # Learning interaction
             if f_x_p < fitness_values[i]:
                 x_new = population[i] + r2 * (population[i] - x_p)
             else:
                 x_new = population[i] - r2 * (population[i] - x_p)
 
-            # Bound x_new
-            x_new = np.clip(np.round(x_new),LOWER_BOUND,UPPER_BOUND)
-
-            # Calculate fitness of x_new
+            x_new = np.clip(np.round(x_new), LOWER_BOUND, UPPER_BOUND)
             f_x_new = fitness(x_new)
 
-            # Compare with the past fitness
+            # Greedy selection
             if f_x_new < fitness_values[i]:
                 population[i] = x_new.copy()
                 fitness_values[i] = f_x_new
-            
 
-        gen_best_fitness_index = np.argmin(fitness_values)
-        gen_best_solution = population[gen_best_fitness_index]
-        gen_best_fitness = fitness_values[gen_best_fitness_index]
+        # Iteration best
+        gen_best_index = np.argmin(fitness_values)
+        gen_best_solution = population[gen_best_index]
+        gen_best_fitness = fitness_values[gen_best_index]
+
         best_fitness_per_gen.append(gen_best_fitness)
 
-            # print(f"Iteration {t+1}: Best Fitness = {gen_best_fitness}")
+        # Global best update
+        if gen_best_fitness < best_fitness:
+            best_fitness = gen_best_fitness
+            best_solution = gen_best_solution.copy()
 
-    best_index = np.argmax(fitness_values)
-    best_fitness = fitness_values[best_index]
-    best_solution = population[best_index]
+        # print(f"Iteration {t+1}: Iteration Best = {gen_best_fitness}, Global Best = {best_fitness}")
 
-    return best_solution, best_fitness ,best_fitness_per_gen
-
+    return best_solution, best_fitness, best_fitness_per_gen
 
 # ==================================================================
-# ITERATE oVER 20 RUNS
+# ITERATE OVER 20 RUNS
 # ==================================================================
 def solve_square_function():
         num_runs = 20
@@ -184,12 +179,12 @@ def solve_square_function():
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || DE(penalty based)")
+        plt.title(f"CONVERGENCE PLOT || TLBO")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        # plt.savefig(f"plots/_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/TLBO_convergence.png", dpi=300)
         plt.show()
 
         # Store results
