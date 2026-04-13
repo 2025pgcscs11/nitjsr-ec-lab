@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 500
-ITERATIONS = 200
+POP_SIZE = 300
+ITERATIONS = 100
 INTERTIA = 0.7
 C1 = 1.5
 C2 = 1.5
@@ -28,7 +28,7 @@ def generate_initial_population(pop_size, m, n):
 # INITIAL VELOCITY
 # ==========================================================
 def generate_initial_velocity(pop_size, n):
-    return np.random.uniform(1, 10, size=(pop_size, n))
+    return np.random.uniform(-1, 1, size=(pop_size, n))
 
 
 # ==========================================================
@@ -150,7 +150,7 @@ def particle_swarm_optimization(C, R, B):
     velocity = generate_initial_velocity(POP_SIZE, n)
 
     fitness_values = np.array([
-        fitness(np.round(population[i]), C, R, B)
+        fitness(np.round(population[i]), C, R)
         for i in range(POP_SIZE)
     ])
 
@@ -179,6 +179,10 @@ def particle_swarm_optimization(C, R, B):
                 + C2 * r2 * (g_best - population[i])
             )
 
+            # add velocity clamping
+            Vmax = m
+            velocity[i] = np.clip(velocity[i], -Vmax, Vmax)
+
             # Position update
             population[i] += velocity[i]
 
@@ -195,18 +199,18 @@ def particle_swarm_optimization(C, R, B):
                 population[i] = repair_particle_greedy_cost(discrete_particle,C,R,B)
 
             # Fitness
-            fitness_values[i] = fitness(discrete_particle, C, R, B)
+            fitness_values[i] = fitness(population[i], C, R)
 
             # Personal best update
             if fitness_values[i] > f_p_best[i]:
-                p_best[i] = discrete_particle.copy()
+                p_best[i] = population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
         # Iteration best
-        current_best = np.max(fitness_values)
-        best_fitness_per_gen.append(current_best)
+        gen_best = np.max(fitness_values)
+        best_fitness_per_gen.append(gen_best)
 
-        # print(f"Generation {gen+1}: Iteration Best = {current_best}")
+        # print(f"Generation {gen+1}: Iteration Best = {gen_best}")
 
         # Global best update 
         best_index = np.argmax(f_p_best)
@@ -228,7 +232,8 @@ def read_gap_file(filename):
         data = list(map(int, f.read().split()))
 
     idx = 0
-    P = data[idx]
+    # P = data[idx]
+    P = 1               # overriding actual instance value to 1
     idx += 1
 
     for _ in range(P):
@@ -283,12 +288,14 @@ def solve_gap_file(filename):
 
             run_time = end_time - start_time
 
+            feasible = is_feasible(best_assignment,R,B)
+
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
             all_best_costs.append(best_cost)
             all_times.append(run_time)
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec, Feasible = {feasible}")
 
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)
@@ -308,9 +315,9 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || PSO(repair based using cost) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.xlabel("Generation / Iteration")
+        plt.ylabel("Best Cost")
+        plt.title(f"CONVERGENCE GRAPH || PARTICLE SWARM OPTIMIZATION ALGORITHM || REPAIR BASED || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -321,9 +328,13 @@ def solve_gap_file(filename):
         # Store results
         results.append({
             "histories": all_histories,
-            "best_costs": all_best_costs,
-            "avg_fitness": avg_fitness
+            "best_cost_per_run": all_best_costs,
+            "best_solution_per_run": all_best_sol,
+            "time_per_run": all_times,
+            "R": R,
+            "B": B
         })
+
 
     return results
 
@@ -356,7 +367,7 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 # ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap_sample_data_txt.txt",
+    # "gap_sample_data_txt.txt",
     # "gap1.txt",
     # "gap2.txt",
     # "gap3.txt",
@@ -376,4 +387,50 @@ files = [
 # EXECUTION STARTS HERE
 # ==========================================================
 if __name__ == "__main__": 
-    solve_multiple_files(files)
+    all_results = solve_multiple_files(files)
+
+    for file, instances in all_results.items():
+        print(f"\n===== SUMMARY FOR FILE: {file} =====")
+
+        for idx, instance in enumerate(instances, start=1):
+
+            profits = np.array(instance["best_cost_per_run"])
+            times = np.array(instance["time_per_run"])
+            solutions = instance["best_solution_per_run"]
+            R = instance["R"]
+            B = instance["B"]
+
+            # Get indices of feasible solutions
+            feasible_indices = [
+                i for i, sol in enumerate(solutions)
+                if is_feasible(sol, R, B)
+            ]
+
+            feasible_count = len(feasible_indices)
+
+            print(f"\n--- Instance {idx} ---")
+
+            if feasible_count == 0:
+                print("No feasible solutions found.")
+                continue
+
+            # Filter only feasible runs
+            feasible_profits = profits[feasible_indices]
+            feasible_times = times[feasible_indices]
+
+            # Compute stats
+            avg_profit = np.mean(feasible_profits)
+            std_profit = np.std(feasible_profits)
+            best_profit = np.max(feasible_profits)
+            worst_profit = np.min(feasible_profits)
+
+            avg_time = np.mean(feasible_times)
+            total_time = np.sum(feasible_times)
+
+            # Print
+            print(f"Feasible runs     : {feasible_count}/{len(profits)}")
+            print(f"Average profit    : {avg_profit:.2f} ± {std_profit:.2f}")
+            print(f"Best profit       : {best_profit:.2f}")
+            print(f"Worst profit      : {worst_profit:.2f}")
+            print(f"Average time      : {avg_time:.4f} s")
+            print(f"Total time        : {total_time:.4f} s")

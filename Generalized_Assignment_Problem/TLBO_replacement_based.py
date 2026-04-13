@@ -68,7 +68,6 @@ def fitness(student, C, R, B):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
 
-
     return cost
 
 
@@ -111,7 +110,7 @@ def teaching_learning_based_optimization(C, R, B):
     ])
 
     # Global best initialization
-    best_index = np.argmin(fitness_values)
+    best_index = np.argmax(fitness_values)
     best_solution = population[best_index].copy()
     best_fitness = fitness_values[best_index]
 
@@ -193,7 +192,7 @@ def teaching_learning_based_optimization(C, R, B):
         # print(f"Generation {gen+1}: Best Fitness = {f_g_best}")
 
         # Global best update
-        if gen_best_fitness < best_fitness:
+        if gen_best_fitness > best_fitness:
             best_fitness = gen_best_fitness
             best_solution = gen_best_solution.copy()
 
@@ -212,7 +211,8 @@ def read_gap_file(filename):
         data = list(map(int, f.read().split()))
 
     idx = 0
-    P = data[idx]
+    # P = data[idx]
+    P = 1               # overriding actual instance value to 1
     idx += 1
 
     for _ in range(P):
@@ -305,8 +305,11 @@ def solve_gap_file(filename):
         # Store results
         results.append({
             "histories": all_histories,
-            "best_costs": all_best_costs,
-            "avg_fitness": avg_fitness
+            "best_cost_per_run": all_best_costs,
+            "best_solution_per_run": all_best_sol,
+            "time_per_run": all_times,
+            "R": R,
+            "B": B
         })
 
     return results
@@ -340,7 +343,7 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 # ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap_sample_data_txt.txt",
+    # "gap_sample_data_txt.txt",
     # "gap1.txt",
     # "gap2.txt",
     # "gap3.txt",
@@ -348,11 +351,11 @@ files = [
     # "gap5.txt",
     # "gap6.txt",
     # "gap7.txt",
-    # "gap8.txt",
+    "gap8.txt",
     # "gap9.txt",
     # "gap10.txt",
     # "gap11.txt",
-    "gap12.txt",
+    # "gap12.txt",
 ]
 
 
@@ -360,4 +363,35 @@ files = [
 # EXECUTION STARTS HERE
 # ==========================================================
 if __name__ == "__main__": 
-    solve_multiple_files(files)
+    all_results = solve_multiple_files(files)
+
+    for file, instances in all_results.items():
+        print(f"\n===== SUMMARY FOR FILE: {file} =====")
+
+        for idx, instance in enumerate(instances, start=1):
+
+            profits = instance["best_cost_per_run"]
+            times = instance["time_per_run"]
+            R = instance["R"]
+            B = instance["B"]
+
+            feasible_count = sum(
+                1 for sol in instance["best_solution_per_run"]
+                if is_feasible(sol, R, B)
+            )
+
+            avg_profit = np.mean(profits)
+            std_profit = np.std(profits)
+            best_profit = np.max(profits)
+            worst_profit = np.min(profits)
+
+            avg_time = np.mean(times)
+            total_time = np.sum(times)
+
+            print(f"\n--- Instance {idx} ---")
+            print(f"Average profit    : {avg_profit:.2f} ± {std_profit:.2f}")
+            print(f"Best profit       : {best_profit:.2f}")
+            print(f"Worst profit      : {worst_profit:.2f}")
+            print(f"Feasible runs     : {feasible_count}/{len(profits)}")
+            print(f"Average time      : {avg_time:.4f} s")
+            print(f"Total time        : {total_time:.4f} s")

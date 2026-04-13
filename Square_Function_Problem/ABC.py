@@ -3,225 +3,248 @@
 # ==========================================================
 import os
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 500
-ITERATIONS = 200
-LIMIT = 1
+POP_SIZE = 300
+ITERATIONS = 100
+DIMENSION = 10
+LOWER_BOUND = 0
+UPPER_BOUND = 30
+LIMIT = 10 
 
 
 # ==========================================================
 # INITIAL POPULATION
 # ==========================================================
-def generate_initial_population(pop_size, m, n):
-    # Each student: length n (jobs), values in [0, m-1]
-    return np.random.randint(0, m, size=(pop_size, n))
+def generate_initial_population():
+    return np.random.uniform(LOWER_BOUND, UPPER_BOUND, size=(POP_SIZE, DIMENSION))
 
 
 # ==========================================================
-# FITNESS FUNCTION (Maximization with Penalty)
+# OBJECTIVE FUNCTION (MINIMIZATION)
 # ==========================================================
-def fitness(student, C, R, B, penalty_weight=1000):
-    cost = 0
-    penalty = 0
-
-    m = len(B)
-    resource_used = [0] * m
-    
-    agents = student.astype(int)
-
-    for j, agent in enumerate(agents):
-        cost += C[agent][j]
-        resource_used[agent] += R[agent][j]
-
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
-
-    return cost - penalty_weight * penalty
+def objective_function(food_source):
+    return np.sum(food_source ** 2)
 
 
 # ==========================================================
-# TEACHING LEARNING BASED OPTIMIZATION
+# FITNESS FUNCTION (for maximization)
 # ==========================================================
-def teaching_learning_based_optimization(C, R, B):
-    m = len(C)      # number of Agents
-    n = len(C[0])   # number of Jobs
+def fitness(f):
+    if f >= 0:
+        return 1 / (1 + f)
+    else:
+        return 1 + abs(f)
 
+
+# ==========================================================
+# ARTIFICIAL BEE COLONY OPTIMIZATION (ABC)
+# ==========================================================
+def artificial_bee_colony_opimization():
     # Initialize random population
-    population = generate_initial_population(POP_SIZE, m, n)
+    population = generate_initial_population()
+
+    # Evaluate objective function values of the population
+    objective_function_values = np.array([
+        objective_function(population[i]) for i in range(POP_SIZE)
+    ])
 
     # Evaluate fitness of the population
     fitness_values = np.array([
-        fitness(population[i], C, R, B)
-        for i in range(POP_SIZE)
+        fitness(objective_function_values[i]) for i in range(POP_SIZE)
     ])
 
+    # Initial trial vector of the popultion
+    trial_vector = np.zeros(POP_SIZE)
 
-    for _ in range(ITERATIONS):
-
-        for i in range(POP_SIZE):
-            ##################################
-            #        TEACHING PHASE          #
-            ##################################
-
-            # Generate random number array
-            r1 = np.random.rand()
-            r2 = np.random.rand()
-
-            # Find X_best
-            x_best_index = np.argmax(fitness_values)
-            x_best = population[x_best_index].copy()
-
-            # Determine X_mean
-            x_mean = np.mean(population, axis=0)
-
-            # Calculate x_new
-            x_new = population[i] + r1 * (x_best - TEACHING_FACTOR * x_mean)
-
-            # Bound x_new
-            x_new = np.clip(np.round(x_new),0,m - 1)
-
-            # Calculate fitness of x_new
-            f_x_new = fitness(x_new,C,R,B)
-
-            # Compare with the past fitness
-            if f_x_new > fitness_values[i]:
-                population[i] = x_new.copy()
-                fitness_values[i] = f_x_new
-            
-
-            ##################################
-            #        LEARNER PHASE           #
-            ##################################
-
-            # Select a random partner solution other than current solution and its fitness value
-            x_p_index = np.random.choice(
-                np.delete(np.arange(population.shape[0]), i)
-            )
-            x_p = population[x_p_index]
-            f_x_p = fitness_values[x_p_index]
-
-            # Calculate x_new
-            if f_x_p > fitness_values[i]:
-                x_new = population[i] + r2 * (population[i] - x_p)
-            else:
-                x_new = population[i] - r2 * (population[i] - x_p)
-
-            # Bound x_new
-            x_new = np.clip(np.round(x_new),0,m - 1)
-
-            # Calculate fitness of x_new
-            f_x_new = fitness(x_new,C,R,B)
-
-            # Compare with the past fitness
-            if f_x_new > fitness_values[i]:
-                population[i] = x_new.copy()
-                fitness_values[i] = f_x_new
-
+    # Global best initialization
     best_index = np.argmax(fitness_values)
-    
-    return population[best_index], fitness_values[best_index]
+    best_solution = population[best_index].copy()
+    best_objective_function_value = objective_function_values[best_index]
+    best_fitness = fitness_values[best_index]
+
+    # Best Objective Function Value per iteration
+    best_objective_function_value_per_gen = []
+
+    for gen in range(ITERATIONS):
+
+        ##################################
+        #     Employed Bee Phase         #
+        ##################################
+        for i in range(POP_SIZE):
+            # Select a random variable from 0 to DIMENSION -1
+            j = np.random.randint(0, DIMENSION)
+
+            # Select a random partner solution other than current solution
+            k = i
+            while k == i:
+                k = np.random.randint(0, POP_SIZE)
+
+            # Select a random number between (-1,1)
+            phi = np.random.uniform(-1, 1)
+
+            # Modify jth variable
+            x_new = population[i].copy()
+            x_new[j] = x_new[j] + phi * (x_new[j] - population[k][j])
+            x_new = np.clip(x_new, LOWER_BOUND, UPPER_BOUND)
+
+            # Evaluate the objective function and fitness of newly generated solution
+            f_new = objective_function(x_new)
+            fit_new = fitness(f_new)
+
+            # Greedy selection and trial vector updation
+            if fit_new > fitness_values[i]:
+                population[i] = x_new
+                objective_function_values[i] = f_new
+                fitness_values[i] = fit_new
+                trial_vector[i] = 0
+            else:
+                trial_vector[i] += 1
 
 
-# ================================================================
-# GENERATE COST MATRIX, RESOURCE MATRIX, CAPACITY VECTOR FROM FILE
-# ================================================================
-def read_gap_file(filename):
-
-    instances = []
-
-    with open(filename, 'r') as f:
-        data = list(map(int, f.read().split()))
-
-    idx = 0
-    P = data[idx]
-    idx += 1
-
-    for _ in range(P):
-
-        m = data[idx]
-        n = data[idx + 1]
-        idx += 2
-
-        C = []
-        for _ in range(m):
-            C.append(data[idx:idx+n])
-            idx += n
-
-        R = []
-        for _ in range(m):
-            R.append(data[idx:idx+n])
-            idx += n
-
-        B = data[idx:idx+m]
-        idx += m
-
-        instances.append((C, R, B))
-
-    return instances
+        # ==================================================
+        # PROBABILITY CALCULATION
+        # ==================================================
+        prob = 0.9 * (fitness_values / np.max(fitness_values)) + 0.1
 
 
-# ==================================================================
-# ITERATE OVER ALL INSTANCES IN A FILE AND APPLY GENETIC ALGORITHM
-# ==================================================================
-def solve_gap_file(filename):
+        # ==================================================
+        # ONLOOKER BEE PHASE
+        # ==================================================
+        i = 0
+        t = 0
 
-    instances = read_gap_file(filename)
+        while t < POP_SIZE:
+            # Generate random number (0,1)
+            r = np.random.rand()
 
-    print(f"\n===== Solving file: {filename} =====\n")
+            if r < prob[i]:
+                # Select a random varible from 0 to n
+                j = np.random.randint(0, DIMENSION)
 
-    for idx, (C, R, B) in enumerate(instances, start=1):
+                # Select a random partner solution other than current solution
+                k = i
+                while k == i:
+                    k = np.random.randint(0, POP_SIZE)
 
-        print(f"Instance {idx}:")
+                # Select a random number between (-1,1)
+                phi = np.random.uniform(-1, 1)
 
-        x_best, f_x_best = teaching_learning_based_optimization(C, R, B)
+                x_new = population[i].copy()
+                x_new[j] = x_new[j] + phi * (x_new[j] - population[k][j])
+                x_new = np.clip(x_new, LOWER_BOUND, UPPER_BOUND)
 
-        print(f"  TLBO Best Fitness = {f_x_best}")
+                # Evaluate the objective function and fitness of newly generated solution
+                f_new = objective_function(x_new)
+                fit_new = fitness(f_new)
+
+                # Greedy selection and trial vector updation
+                if fit_new > fitness_values[i]:
+                    population[i] = x_new
+                    objective_function_values[i] = f_new
+                    fitness_values[i] = fit_new
+                    trial_vector[i] = 0
+                else:
+                    trial_vector[i] += 1
+
+                # Increment t
+                t += 1
+
+            i = (i + 1) % POP_SIZE
+
+
+        # ==================================================
+        # SCOUT BEE PHASE
+        # ==================================================
+        for i in range(POP_SIZE):
+            if trial_vector[i] > LIMIT:
+                # Generate a random solution
+                x_new = np.random.uniform(LOWER_BOUND, UPPER_BOUND + 1, DIMENSION)
+
+                population[i] = x_new
+                objective_function_values[i] = objective_function(x_new)
+                fitness_values[i] = fitness(objective_function_values[i])
+                trial_vector[i] = 0
+
+
+        # ==================================================
+        # GLOBAL BEST UPDATE
+        # ==================================================
+        gen_best_index = np.argmax(fitness_values)
+
+        if fitness_values[gen_best_index] > best_fitness:
+            best_fitness = fitness_values[gen_best_index]
+            best_solution = population[gen_best_index].copy()
+            best_objective_function_value = objective_function_values[gen_best_index]
+
+        # Store history
+        best_objective_function_value_per_gen.append(best_objective_function_value)
+
+
+    return best_solution, best_objective_function_value, best_objective_function_value_per_gen
 
 
 # ==========================================================
-# ITERATE OVER ALL FILES
+# MULTIPLE RUNS
 # ==========================================================
-def solve_multiple_files(file_list, base_dir="gap_dataset"):
+def solve_square_function():
+        num_runs = 20
+        
+        all_histories = []
+        all_best_sol = []
+        all_best_costs = []
+        all_times = []
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset_dir = os.path.join(script_dir, base_dir)
+        # Run DE multiple times
+        for run in range(num_runs):
+            start_time = time.perf_counter()
 
-    for file in file_list:
+            best_assignment, best_cost, fitness_per_gen = artificial_bee_colony_opimization()
 
-        file_path = os.path.join(dataset_dir, file)
+            end_time = time.perf_counter()
 
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"GAP file not found: {file_path}")
+            run_time = end_time - start_time
 
-        solve_gap_file(file_path)
+            all_histories.append(fitness_per_gen)
+            all_best_sol.append(best_assignment)
+            all_best_costs.append(best_cost)
+            all_times.append(run_time)
+
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+
+        # Convert to numpy array for easier computation
+        all_histories = np.array(all_histories)
+
+        # Compute average convergence
+        avg_fitness = np.mean(all_histories, axis=0)
+
+        # Plot for THIS instance
+        plt.figure()
+
+        # Plot all runs (light)
+        for i, history in enumerate(all_histories):
+            plt.plot(history, alpha=0.6, label=f"Run {i+1}")
+
+        # Plot average (bold)
+        plt.plot(avg_fitness, linewidth=2, label="Average")
+
+        plt.xlabel("Generation")
+        plt.ylabel("Best Cost (Min)")
+        plt.title("ABC Convergence (Sphere Function)")
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig(f"plots/ABC_convergence.png", dpi=300)
+        plt.show()
 
 
 # ==========================================================
-# ALL FILE NAMES
+# MAIN
 # ==========================================================
-files = [
-    "gap_sample_data_txt.txt",
-    # "gap1.txt",
-    # "gap2.txt",
-    # "gap3.txt",
-    # "gap4.txt",
-    # "gap5.txt",
-    # "gap6.txt",
-    # "gap7.txt",
-    # "gap8.txt",
-    # "gap9.txt",
-    # "gap10.txt",
-    # "gap11.txt",
-    "gap12.txt",
-]
-
-
-# ==========================================================
-# EXECUTION STARTS HERE
-# ==========================================================
-if __name__ == "__main__": 
-    solve_multiple_files(files)
+if __name__ == "__main__":
+    solve_square_function()

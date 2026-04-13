@@ -13,29 +13,24 @@ import matplotlib.pyplot as plt
 POP_SIZE = 100
 ITERATIONS = 300
 DIMENSION = 10
-LOWER_BOUND = -22
-UPPER_BOUND = 20
-SCALING_FACTOR = 0.5
-CROSSOVER_RATE = 0.9
+LOWER_BOUND = 0
+UPPER_BOUND = 30
+SCALING_FACTOR = 0.85
+CROSSOVER_RATE = 0.8
 
 # ==========================================================
 # INITIAL POPULATION
 # ==========================================================
-def generate_initial_population(pop_size,dimension):
+def generate_initial_population():
     # generate population matrix of pop_size * dimension within the range of 
-    return np.random.randint(LOWER_BOUND,UPPER_BOUND, size=(pop_size, dimension))
+    return np.random.randint(LOWER_BOUND,UPPER_BOUND, size=(POP_SIZE, DIMENSION))
 
 
 # ==========================================================
 # FITNESS FUNCTION 
 # ==========================================================
-def fitness(solution):
-    cost = 0.0
-    
-    for dec_var in solution:
-        cost += dec_var * dec_var 
-    
-    return cost
+def fitness(vector):
+    return np.sum(vector ** 2)
 
 
 # ==========================================================
@@ -43,30 +38,26 @@ def fitness(solution):
 # ==========================================================
 def differential_evolution_based_optimization():
     # Initialize random target vector
-    target_vector = generate_initial_population(POP_SIZE, DIMENSION)
-
-    # Store best solution
-    best_solution = None
-    # Store best solution's fitness value
-    best_fitness = float('inf')
-    # Best Fitness per generation (iteration best)
-    best_fitness_per_gen = []
-
-    donar_vector = np.zeros((POP_SIZE, DIMENSION))
-    trial_vector = np.zeros((POP_SIZE, DIMENSION))
-
+    target_vector = generate_initial_population()
+    
     # Evaluate fitness of the target vector
     fitness_values = np.array([
         fitness(target_vector[i])
         for i in range(POP_SIZE)
     ])
 
-    # ==========================
-    # Initialize global best
+     # ==========================
+    # Global best initialization
     # ==========================
     best_index = np.argmin(fitness_values)
     best_solution = target_vector[best_index].copy()
     best_fitness = fitness_values[best_index]
+    
+    # Best Fitness per generation (iteration best)
+    best_fitness_per_gen = []
+
+    donar_vector = np.zeros((POP_SIZE, DIMENSION))
+    trial_vector = np.zeros((POP_SIZE, DIMENSION))
 
     for t in range(ITERATIONS):
 
@@ -119,7 +110,6 @@ def differential_evolution_based_optimization():
 # ==================================================================
 def solve_square_function():
         num_runs = 20
-        results = []
         
         all_histories = []
         all_best_sol = []
@@ -154,14 +144,14 @@ def solve_square_function():
 
         # Plot all runs (light)
         for i, history in enumerate(all_histories):
-            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+            plt.plot(history, alpha=0.6, label=f"Run {i+1}")
 
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || DE")
+        plt.title("DE Convergence (Sphere Function)")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -169,12 +159,6 @@ def solve_square_function():
         plt.savefig(f"plots/DE_convergence.png", dpi=300)
         plt.show()
 
-        # Store results
-        results.append({
-            "histories": all_histories,
-            "best_costs": all_best_costs,
-            "avg_fitness": avg_fitness
-        })
 
 
 # ==========================================================

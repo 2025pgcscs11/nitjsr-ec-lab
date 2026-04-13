@@ -20,21 +20,16 @@ TEACHING_FACTOR = 2
 # ==========================================================
 # INITIAL POPULATION
 # ==========================================================
-def generate_initial_population(pop_size,dimension):
+def generate_initial_population():
     # generate population matrix of pop_size * dimension within the range of 
-    return np.random.randint(LOWER_BOUND,UPPER_BOUND, size=(pop_size, dimension))
+    return np.random.randint(LOWER_BOUND,UPPER_BOUND, size=(POP_SIZE,DIMENSION))
 
 
 # ==========================================================
-# FITNESS FUNCTION (Maximization with Penalty)
+# FITNESS FUNCTION (MINIMIZATION)
 # ==========================================================
-def fitness(solution):
-    cost = 0.0
-    
-    for dec_var in solution:
-        cost += dec_var * dec_var 
-    
-    return cost
+def fitness(student):
+    return np.sum(student ** 2)
 
 
 # ==========================================================
@@ -42,7 +37,7 @@ def fitness(solution):
 # ==========================================================
 def teaching_learning_based_optimization():
     # Initialize random population
-    population = generate_initial_population(POP_SIZE, DIMENSION)
+    population = generate_initial_population()
 
     # Evaluate fitness of the population
     fitness_values = np.array([
@@ -134,66 +129,55 @@ def teaching_learning_based_optimization():
 # ITERATE OVER 20 RUNS
 # ==================================================================
 def solve_square_function():
-        num_runs = 20
-        results = []
-        
-        all_histories = []
-        all_best_sol = []
-        all_best_costs = []
-        all_times = []
 
-        # Run DE multiple times
-        for run in range(num_runs):
-            start_time = time.perf_counter()
+    num_runs = 20
 
-            best_assignment, best_cost, fitness_per_gen = teaching_learning_based_optimization()
+    all_histories = []
+    all_best_sol = []
+    all_best_costs = []
+    all_times = []
 
-            end_time = time.perf_counter()
+    for run in range(num_runs):
 
-            run_time = end_time - start_time
+        start_time = time.perf_counter()
 
-            all_histories.append(fitness_per_gen)
-            all_best_sol.append(best_assignment)
-            all_best_costs.append(best_cost)
-            all_times.append(run_time)
+        best_sol, best_cost, history = teaching_learning_based_optimization()
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+        end_time = time.perf_counter()
 
-        # Convert to numpy array for easier computation
-        all_histories = np.array(all_histories)
+        run_time = end_time - start_time
 
-        # Compute average convergence
-        avg_fitness = np.mean(all_histories, axis=0)
+        all_histories.append(history)
+        all_best_sol.append(best_sol)
+        all_best_costs.append(best_cost)
+        all_times.append(run_time)
 
-        # ==========================
-        # Plot for THIS instance
-        # ==========================
-        plt.figure()
+        print(f"Run {run+1}: Best Cost = {best_cost:.6f}, Time = {run_time:.4f} sec")
 
-        # Plot all runs (light)
-        for i, history in enumerate(all_histories):
-            plt.plot(history, alpha=0.4, label=f"Run {i+1}")
+    all_histories = np.array(all_histories)
+    avg_curve = np.mean(all_histories, axis=0)
 
-        # Plot average (bold)
-        plt.plot(avg_fitness, linewidth=2, label="Average")
+    # ==================================================
+    # PLOT
+    # ==================================================
+    plt.figure()
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || TLBO")
-        plt.legend(loc='best')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/TLBO_convergence.png", dpi=300)
-        plt.show()
+    for i, history in enumerate(all_histories):
+        plt.plot(history, alpha=0.6, label=f"Run {i+1}")
 
-        # Store results
-        results.append({
-            "histories": all_histories,
-            "best_costs": all_best_costs,
-            "avg_fitness": avg_fitness
-        })
 
+    plt.plot(avg_curve, linewidth=2, label="Average")
+
+    plt.xlabel("Generation")
+    plt.ylabel("Best Cost (Min)")
+    plt.title("TLBO Convergence (Sphere Function)")
+    plt.legend(loc='best')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    os.makedirs("plots", exist_ok=True)
+    plt.savefig("plots/TLBO_convergence.png", dpi=300)
+    plt.show()
 
 
 # ==========================================================

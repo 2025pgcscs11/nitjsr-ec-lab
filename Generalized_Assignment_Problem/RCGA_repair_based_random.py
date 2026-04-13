@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 500
-GENERATIONS = 200
+POP_SIZE = 300
+GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 DISTRIBUTIOIN_INDEX = 20
@@ -277,7 +277,8 @@ def read_gap_file(filename):
         data = list(map(int, f.read().split()))
 
     idx = 0
-    P = data[idx]
+    # P = data[idx]
+    P = 1               # overriding actual instance value to 1
     idx += 1
 
     for _ in range(P):
@@ -372,8 +373,11 @@ def solve_gap_file(filename):
         # Store results
         results.append({
             "histories": all_histories,
-            "best_costs": all_best_costs,
-            "avg_fitness": avg_fitness
+            "best_cost_per_run": all_best_costs,
+            "best_solution_per_run": all_best_sol,
+            "time_per_run": all_times,
+            "R": R,
+            "B": B
         })
 
     return results
@@ -406,7 +410,7 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 # ALL FILE NAMES
 # ==========================================================
 files = [
-    "gap_sample_data_txt.txt",
+    # "gap_sample_data_txt.txt",
     # "gap1.txt",
     # "gap2.txt", 
     # "gap3.txt",
@@ -414,11 +418,11 @@ files = [
     # "gap5.txt",
     # "gap6.txt",
     # "gap7.txt",
-    # "gap8.txt",
+    "gap8.txt",
     # "gap9.txt",
     # "gap10.txt",
     # "gap11.txt",
-    "gap12.txt"
+    # "gap12.txt"
 ]
 
 
@@ -426,4 +430,50 @@ files = [
 # EXECUTION STARTS HERE
 # ==========================================================
 if __name__ == "__main__": 
-    solve_multiple_files(files)
+    all_results = solve_multiple_files(files)
+
+    for file, instances in all_results.items():
+        print(f"\n===== SUMMARY FOR FILE: {file} =====")
+
+        for idx, instance in enumerate(instances, start=1):
+
+            profits = np.array(instance["best_cost_per_run"])
+            times = np.array(instance["time_per_run"])
+            solutions = instance["best_solution_per_run"]
+            R = instance["R"]
+            B = instance["B"]
+
+            # Get indices of feasible solutions
+            feasible_indices = [
+                i for i, sol in enumerate(solutions)
+                if is_feasible(sol, R, B)
+            ]
+
+            feasible_count = len(feasible_indices)
+
+            print(f"\n--- Instance {idx} ---")
+
+            if feasible_count == 0:
+                print("No feasible solutions found.")
+                continue
+
+            # Filter only feasible runs
+            feasible_profits = profits[feasible_indices]
+            feasible_times = times[feasible_indices]
+
+            # Compute stats
+            avg_profit = np.mean(feasible_profits)
+            std_profit = np.std(feasible_profits)
+            best_profit = np.max(feasible_profits)
+            worst_profit = np.min(feasible_profits)
+
+            avg_time = np.mean(feasible_times)
+            total_time = np.sum(feasible_times)
+
+            # Print
+            print(f"Feasible runs     : {feasible_count}/{len(profits)}")
+            print(f"Average profit    : {avg_profit:.2f} ± {std_profit:.2f}")
+            print(f"Best profit       : {best_profit:.2f}")
+            print(f"Worst profit      : {worst_profit:.2f}")
+            print(f"Average time      : {avg_time:.4f} s")
+            print(f"Total time        : {total_time:.4f} s")
