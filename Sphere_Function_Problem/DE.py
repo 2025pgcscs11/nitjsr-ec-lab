@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 100
-ITERATIONS = 300
+POP_SIZE = 300
+ITERATIONS = 100
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30

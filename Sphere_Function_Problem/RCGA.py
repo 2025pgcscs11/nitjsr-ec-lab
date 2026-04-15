@@ -14,53 +14,24 @@ GENERATIONS = 100
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
+LIMIT = 5 
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
-
-
-# ==========================================================
-# INITIAL POPULATION
-# ==========================================================
-def generate_initial_population():
-    # Number of bits needed to represent values up to UPPER_BOUND
-    num_bits = int(np.ceil(np.log2(UPPER_BOUND)))
-
-    # Generate random integers in [0, 1]
-    population = np.random.randint(0, 2, size=(POP_SIZE, num_bits * DIMENSION))
-   
-    return np.array(population)
-
+DISTRIBUTION_INDEX = 20
+MUTATION_DISTRIBUTION_INDEX = 20
 
 # ==========================================================
-# DECODE CHROMOSOME AND EXTRACT AGENTS
+# INITIAL POPULATION (Real Values)
 # ==========================================================
-def decode_chromosome(chromosome):
-    num_bits = int(np.ceil(np.log2(UPPER_BOUND)))
-    agents = []
-
-    for j in range(len(chromosome) // num_bits):
-        start = j * num_bits
-        end = start + num_bits
-
-        value = 0
-        for bit in chromosome[start:end]:
-            value = (value << 1) | bit
-
-        # Keep within bounds
-        precision = (UPPER_BOUND - LOWER_BOUND)/(2**num_bits -1)
-        value = LOWER_BOUND + precision * value
-
-        agents.append(value)
-
-    return agents
+def generate_initial_population(pop_size, dimension):
+    return np.random.uniform(LOWER_BOUND, UPPER_BOUND, size=(POP_SIZE, DIMENSION))
 
 
 # ==========================================================
 # FITNESS FUNCTION (MINIMIZATION)
 # ==========================================================
 def fitness(chromosome):
-    decoded = np.array(decode_chromosome(chromosome))
-    return np.sum(decoded ** 2)
+    return np.sum(chromosome ** 2)
 
 
 # ==========================================================
@@ -101,35 +72,70 @@ def binary_tournament_selection(population, fitness, k=2, problem="min"):
 
 
 # ==========================================================
-# CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
+# SIMULATED BINARY CROSSOVER (SBX)
 # ==========================================================
 def crossover(p1, p2):
-    if np.random.rand() < CROSSOVER_RATE:
-        point = np.random.randint(1, len(p1) - 2)
-        return (
-        np.concatenate((p1[:point], p2[point:])),
-        np.concatenate((p2[:point], p1[point:]))
-        )
-    return p1.copy(), p2.copy()
+    # If random number >= crossover rate → children = parents
+    if np.random.rand() >= CROSSOVER_RATE:
+        return p1[:], p2[:]
+
+    child1 = []
+    child2 = []
+
+    for x1, x2 in zip(p1, p2):
+        u = np.random.rand()
+        # Compute beta
+        if u <= 0.5:
+            beta = (2 * u) ** (1.0 / (DISTRIBUTION_INDEX + 1))
+        else:
+            beta = (1 / (2 * (1 - u))) ** (1.0 / (DISTRIBUTION_INDEX + 1))
+
+        # Generate children
+        c1 = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
+        c2 = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
+
+        child1.append(c1)
+        child2.append(c2)
+    
+    # Keep within bounds
+    child1 = np.clip(child1, LOWER_BOUND, UPPER_BOUND)
+    child2 = np.clip(child2, LOWER_BOUND, UPPER_BOUND)
+
+    return np.array(child1), np.array(child2)
 
 
 # ==========================================================
-# MUTATION IN A CHROMOSOME (BIT-WISE)
+# POLYNOMIAL MUTATION
 # ==========================================================
 def mutate(chromosome):
-    chromosome = chromosome.copy()  
-    for i in range(len(chromosome)):
-        if np.random.rand() < MUTATION_RATE:
-            chromosome[i] ^= 1
+    chromosome = chromosome.copy()
+
+    if np.random.rand() >= MUTATION_RATE:
+        return chromosome
+    else:
+        r = np.random.rand(DIMENSION)
+        for i in range(len(chromosome)):
+            if r[i] < 0.5:
+                delta = (2 * r[i]) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1)) - 1
+            else:
+                delta = 1 - (2 * (1 - r[i])) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1))
+
+            # Apply mutation
+            chromosome[i] = chromosome[i] + delta * (UPPER_BOUND - LOWER_BOUND)
+
+
+    # Keep within bounds
+    chromosome = np.clip(chromosome, LOWER_BOUND, UPPER_BOUND)
+
     return chromosome
 
 
 # ==========================================================
-# BINARY-CODED GENETIC ALGORITHM (BCGA)
-# ==========================================================
-def binary_coded_genetic_algorithm():
+# REAL-CODED GENETIC ALGORITHM (RCGA)
+# ===========================================================
+def real_coded_genetic_algorithm():
     # Initialize random population
-    population = generate_initial_population()
+    population = generate_initial_population(POP_SIZE, DIMENSION)
 
     # Evaluate fitness of the population
     fitness_values = np.array([
@@ -147,10 +153,9 @@ def binary_coded_genetic_algorithm():
         mating_pool = binary_tournament_selection(population,fitness_values)
         offspring_population = []
 
-        # CROSSOVER
         for i in range(POP_SIZE // 2):
             p1, p2 = mating_pool[np.random.choice(len(mating_pool), 2, replace=False)]
-
+            
             c1, c2 = crossover(p1, p2)
 
             # offsprings are added
@@ -160,7 +165,8 @@ def binary_coded_genetic_algorithm():
         # MUTATION
         for i in range(len(offspring_population)):
             offspring_population[i] = mutate(offspring_population[i])
-        
+
+
         # Evaluate offspring fitness 
         offspring_fitness = [fitness(ind) for ind in offspring_population]
 
@@ -176,7 +182,7 @@ def binary_coded_genetic_algorithm():
         fitness_values = np.array([combined_fitness[i] for i in sorted_indices[:POP_SIZE]])
 
         # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
+        gen_best_fitness = fitness_values[0]
         best_fitness_per_gen.append(gen_best_fitness)
 
         # Update global best
@@ -187,8 +193,6 @@ def binary_coded_genetic_algorithm():
         # print(f"Generation {gen+1}: Best Fitness = {gen_best_fitness}")
 
     return best_solution, best_fitness, best_fitness_per_gen
-
-
 
 # ==========================================================
 # MULTIPLE RUNS
@@ -206,7 +210,7 @@ def solve_square_function():
 
         start_time = time.perf_counter()
 
-        best_sol, best_cost, history = binary_coded_genetic_algorithm()
+        best_sol, best_cost, history = real_coded_genetic_algorithm()
 
         end_time = time.perf_counter()
 
@@ -235,13 +239,13 @@ def solve_square_function():
 
     plt.xlabel("Generation")
     plt.ylabel("Best Cost (Min)")
-    plt.title("BCGA Convergence (Sphere Function)")
+    plt.title("RCGA Convergence (Sphere Function)")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
     os.makedirs("plots", exist_ok=True)
-    plt.savefig("plots/BCGA_convergence.png", dpi=300)
+    plt.savefig("plots/RCGA_convergence.png", dpi=300)
     plt.show()
 
 

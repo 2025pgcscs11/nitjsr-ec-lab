@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 100
-ITERATIONS = 300
+POP_SIZE = 300
+ITERATIONS = 100
 DIMENSION = 10
-LOWER_BOUND = -22
-UPPER_BOUND = 20
+LOWER_BOUND = 0
+UPPER_BOUND = 30
 TEACHING_FACTOR = 2
 
 
@@ -124,6 +124,7 @@ def teaching_learning_based_optimization():
         # print(f"Iteration {t+1}: Iteration Best = {gen_best_fitness}, Global Best = {best_fitness}")
 
     return best_solution, best_fitness, best_fitness_per_gen
+
 
 # ==================================================================
 # ITERATE OVER 20 RUNS

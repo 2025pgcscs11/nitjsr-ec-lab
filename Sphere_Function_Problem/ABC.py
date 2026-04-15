@@ -62,7 +62,7 @@ def artificial_bee_colony_opimization():
     trial_vector = np.zeros(POP_SIZE)
 
     # Global best initialization
-    best_index = np.argmax(fitness_values)
+    best_index = np.argmin(fitness_values)
     best_solution = population[best_index].copy()
     best_objective_function_value = objective_function_values[best_index]
     best_fitness = fitness_values[best_index]

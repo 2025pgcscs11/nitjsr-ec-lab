@@ -9,55 +9,49 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-GENERATIONS = 100
+POP_SIZE = 500
+ITERATIONS = 200
+SCALING_FACTOR = 0.85
 CROSSOVER_RATE = 0.8
-MUTATION_RATE = 0.1
 
 # ==========================================================
-# INITIAL POPULATION (BINARY ENCODED)
+# INITIAL POPULATION (REALENCODED)
 # ==========================================================
 def generate_initial_population(params):
     N = params["N"]
     t_min = params["t_min"]
     t_max = params["t_max"]
 
-    num_bits_T = int(np.ceil(np.log2(t_max)))
 
     population = []
 
     for _ in range(POP_SIZE):
-        validators = np.random.randint(0, 2, size=N)
+        validators = np.random.rand(N)   # [0,1]
+        T = np.random.uniform(t_min, t_max)
 
-        T = np.random.randint(t_min, t_max + 1)
-        T_bits = list(map(int, format(T, f'0{num_bits_T}b')))
-
-        chromosome = np.concatenate([validators, T_bits])
-        population.append(chromosome)
+        particle = np.concatenate([validators, [T]])
+        population.append(particle)
 
     return np.array(population)
 
 
 # ==========================================================
-# DECODE CHROMOSOME
+# DECODE particle
 # ==========================================================
-def decode_chromosome(chromosome, params):
+def decode_particle(particle, params):
     N = params["N"]
     t_min = params["t_min"]
     t_max = params["t_max"]
 
-    num_bits_T = int(np.ceil(np.log2(t_max)))
+    v = particle[:params["N"]]
+    T = int(round(particle[-1]))
 
-    validators = chromosome[:N]
-    T_bits = chromosome[N:]
+    # enforce bounds
+    T = np.clip(T, t_min, t_max)
 
-    T = 0
-    for bit in T_bits:
-        T = (T << 1) | bit
+    # selected = np.where(v >= 0.5)[0]
+    selected = [i for i in range(N) if np.random.rand() < v[i]]
 
-    T = t_min + ((t_max - t_min) / (2 ** num_bits_T -1)) * T
-
-    selected = np.where(validators == 1)[0]
 
     return selected, T
 
@@ -65,14 +59,14 @@ def decode_chromosome(chromosome, params):
 # ==========================================================
 # FITNESS FUNCTION (Minimization with Penalty)
 # ==========================================================
-def fitness(chromosome, params):
-    selected, T = decode_chromosome(chromosome, params)
+def fitness(particle, params):
+    selected, T = decode_particle(particle, params)
 
     phi = params["phi"]
     f = len(selected)
 
     if f == 0:
-        return -1e9  # invalid
+        return +1e9  # invalid
 
     # COST
     cost = sum(phi[i] for i in selected) * T
@@ -101,114 +95,78 @@ def fitness(chromosome, params):
 
 
 # ==========================================================
-# SELECT A PARENT 
+# DIFFERENTIAL EVOLUTION BASED OPTIMIZATION
 # ==========================================================
-def tournament_selection(population, fitness_values, k=3, minimize=True):
-    pop_size = len(population)                     # use current size
-    k = min(k, pop_size)                            # ensure k ≤ pop_size
-    if pop_size == 0:
-        raise ValueError("Population is empty – cannot select parents.")
-    competitors = np.random.choice(pop_size, k, replace=False)
-
-    best_index = competitors[0]
-    for idx in competitors[1:]:
-        if minimize:
-            if fitness_values[idx] < fitness_values[best_index]:
-                best_index = idx
-        else:
-            if fitness_values[idx] > fitness_values[best_index]:
-                best_index = idx
-
-    return population[best_index].copy()
-
-
-# ==========================================================
-# CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
-# ==========================================================
-def crossover(p1, p2):
-    if np.random.rand() < CROSSOVER_RATE:
-        point = np.random.randint(1, len(p1) - 2)
-        return (
-        np.concatenate((p1[:point], p2[point:])),
-        np.concatenate((p2[:point], p1[point:]))
-        )
-    return p1.copy(), p2.copy()
-
-
-# ==========================================================
-# MUTATION IN A CHROMOSOME (BIT-WISE)
-# ==========================================================
-def mutate(chromosome):
-    chromosome = chromosome.copy()  
-    for i in range(len(chromosome)):
-        if np.random.rand() < MUTATION_RATE:
-            chromosome[i] ^= 1
-    return chromosome
-
-
-# ==========================================================
-# BINARY-CODED GENETIC ALGORITHM
-# ==========================================================
-def binary_coded_genetic_algorithm(params):
-    # Generate Initial Population
-    population = generate_initial_population(params)
-
-    # Evaluate fitness values
-    fitness_values = [fitness(chromosome, params) for chromosome in population]
-
-    # Store best chromosome and its fitness value
-    best_idx = np.argmin(fitness_values)
-    best_solution = population[best_idx]
-    best_fitness = fitness_values[best_idx]
+def differential_evolution_based_optimization(params):
+   # Initialize random target vector
+    target_vector = generate_initial_population(params)
     
-    # Best Fitness per generation
+    # Evaluate fitness of the target vector
+    fitness_values = np.array([
+        fitness(target_vector[i], params)
+        for i in range(POP_SIZE)
+    ])
+
+     # ==========================
+    # Global best initialization
+    # ==========================
+    best_index = np.argmin(fitness_values)
+    best_solution = target_vector[best_index].copy()
+    best_fitness = fitness_values[best_index]
+    
+    # Best Fitness per generation (iteration best)
     best_fitness_per_gen = []
 
+    N = params["N"]
+    t_min = params["t_min"]
+    t_max = params["t_max"]
 
-    for gen in range(GENERATIONS):
-        offspring_population = []
+    donar_vector = np.zeros((POP_SIZE, N + 1))
+    trial_vector = np.zeros((POP_SIZE, N + 1))
 
-        # CROSSOVER
-        for i in range(POP_SIZE // 2):
-            p1 = tournament_selection(population, fitness_values)
-            p2 = tournament_selection(population, fitness_values)
+    for t in range(ITERATIONS):
 
-            c1, c2 = crossover(p1, p2)
+        for i in range(POP_SIZE):
+            # Generate random number array
+            r1, r2, r3 = np.random.choice(POP_SIZE, 3, replace=False)
 
-            # offsprings are added
-            offspring_population.append(c1)
-            offspring_population.append(c2)
-        
+            # Generate Donar Vector (mutation)
+            donar_vector[i] = target_vector[r1] + SCALING_FACTOR * (target_vector[r2] - target_vector[r3])
 
-        # MUTATION
-        for i in range(len(offspring_population)):
-            offspring_population[i] = mutate(offspring_population[i])
-        
-    
-        # Evaluate offspring fitness 
-        offspring_fitness = [fitness(ind, params) for ind in offspring_population]
+            # Generate Trial Vector 
+            del_ = np.random.randint(N + 1)
 
-        # Combine
-        combined_population = list(population) + offspring_population
-        combined_fitness = list(fitness_values) + offspring_fitness
+            for j in range(N + 1):
+                if np.random.rand() <= CROSSOVER_RATE or j == del_:
+                    trial_vector[i][j] = donar_vector[i][j]
+                else:
+                    trial_vector[i][j] = target_vector[i][j]
 
-        # Sort
-        sorted_indices = np.argsort(combined_fitness)
+            # Bound Solution  
+            trial_vector[:N] = np.clip(trial_vector[:N], 0.0, 1.0)
+            trial_vector[N]  = np.clip(trial_vector[N], t_min, t_max)
 
-        # Select next generation
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
+            # Selection
+            temp = fitness(trial_vector[i], params)
+            if temp < fitness_values[i]:
+                target_vector[i] = trial_vector[i].copy()
+                fitness_values[i] = temp
 
-        # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
+
+        # Iteration best (current population)
+        gen_best_index = np.argmin(fitness_values)
+        gen_best_solution = target_vector[gen_best_index]
+        gen_best_fitness = fitness_values[gen_best_index]
+
         best_fitness_per_gen.append(gen_best_fitness)
 
-        # Update global best
+        # Global best update
         if gen_best_fitness < best_fitness:
             best_fitness = gen_best_fitness
-            best_solution = population[0]
+            best_solution = gen_best_solution.copy()
 
-        # print(f"Generation {gen+1}: Best Fitness = {gen_best_fitness}")
+        # val, T =decode_chromosome(population[0],params)
+        # print(f"Iteration {gen+1}:  Best Fitness = {gen_best_fitness}  Number of Validators = {len(val)}   Number of Transactions = {T}")
 
     return best_solution, best_fitness, best_fitness_per_gen
 
@@ -265,7 +223,7 @@ def solve_gap_file(filename):
     print(f"\n===== Solving file: {filename} =====\n")
 
     for idx, instance in enumerate(instances, start=1):
-        print(f"\nInstance {idx}:")
+        print(f"\nSetting {idx}:")
 
         params = instance
 
@@ -342,14 +300,14 @@ def solve_gap_file(filename):
         num_runs = 20
         all_histories = []
         all_best_sol = []
-        all_best_costs = []
+        all_best_utilitys = []
         all_times = []
 
         # Run GA multiple times
         for run in range(num_runs):
             start_time = time.perf_counter()
 
-            best_assignment, best_cost, fitness_per_gen = binary_coded_genetic_algorithm(params)
+            best_assignment, best_utility, fitness_per_gen = differential_evolution_based_optimization(params)
 
             end_time = time.perf_counter()
 
@@ -357,11 +315,11 @@ def solve_gap_file(filename):
 
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
-            all_best_costs.append(best_cost)
+            all_best_utilitys.append(best_utility)
             all_times.append(run_time)
 
-
-            print(f"  Run {run+1}: Best Utility = {best_cost}, Time = {run_time:.4f} sec")
+            val, T =decode_particle(best_assignment,params)
+            print(f"  Run {run+1}: Best Utility = {best_utility}, No. of Validators = {len(val)}, No. of Transactions = {T}, Best Time = {run_time:.4f} sec")
 
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)
@@ -383,20 +341,19 @@ def solve_gap_file(filename):
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || BCGA || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.title(f"CONVERGENCE PLOT || PSO || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_PSO_penalty_convergence.png", dpi=300)
         plt.show()
 
         # Store results
         results.append({
             "histories": all_histories,
-            "best_cost_per_run": all_best_costs,
+            "best_utility_per_run": all_best_utilitys,
             "best_solution_per_run": all_best_sol,
-            "time_per_run": all_times,
             "time_per_run": all_times,
             "params" : params
         })
@@ -416,7 +373,6 @@ def solve_multiple_files(file_list,base_dir="bco_dataset"):
     dataset_dir = os.path.join(script_dir, base_dir)
 
     for file in file_list:
-        file_path = os.path.join( dataset_dir,file)
         file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
@@ -432,7 +388,7 @@ def solve_multiple_files(file_list,base_dir="bco_dataset"):
 # ==========================================================
 files = [
     "bco1.txt",
-    # "bco2.txt", 
+    "bco2.txt", 
 ]
 
 
@@ -447,11 +403,11 @@ if __name__ == "__main__":
 
         for idx, instance in enumerate(instances, start=1):
 
-            utilities = np.array(instance["best_cost_per_run"])
+            utilities = np.array(instance["best_utility_per_run"])
             times = np.array(instance["time_per_run"])
-            solutions = instance["best_solution_per_run"]
+            solutions = np.array(instance["best_solution_per_run"])
             params = instance["params"]
-            print(f"\n--- Instance {idx} ---")
+            print(f"\n--- Setiing {idx} ---")
 
             # Compute stats
             avg_utility = np.mean(utilities)
@@ -460,14 +416,15 @@ if __name__ == "__main__":
             best_solution = solutions[best_utility_index]
             best_utility = utilities[best_utility_index]
             worst_utility = np.max(utilities)
-            validators, T = decode_chromosome(best_solution,params)
+            number_of_validators, T = decode_particle(best_solution,params)
             avg_time = np.mean(times)
             total_time = np.sum(times)
 
             # Print
-            print(f"Validators         : {validators},Transactions:{T}")
-            print(f"Average utility    : {avg_utility:.2f} ± {std_utility:.2f}")
-            print(f"Best utility       : {best_utility:.2f}")
-            print(f"Worst utility      : {worst_utility:.2f}")
-            print(f"Average time       : {avg_time:.4f} s")
-            print(f"Total time         : {total_time:.4f} s")
+            print(f"Number of Validators   : {len(number_of_validators)}")
+            print(f"Number of Transactions : {T}")
+            print(f"Average utility        : {avg_utility:.2f} ± {std_utility:.2f}")
+            print(f"Best utility           : {best_utility:.2f}")
+            print(f"Worst utility          : {worst_utility:.2f}")
+            print(f"Average time           : {avg_time:.4f} s")
+            print(f"Total time             : {total_time:.4f} s")
