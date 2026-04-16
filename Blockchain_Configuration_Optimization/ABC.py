@@ -435,12 +435,12 @@ def solve_gap_file(filename):
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || PSO || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.title(f"CONVERGENCE PLOT || ABC || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_PSO_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_ABC_convergence.png", dpi=300)
         plt.show()
 
         # Store results
