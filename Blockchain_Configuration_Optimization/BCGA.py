@@ -74,11 +74,11 @@ def fitness(chromosome, params):
     phi = params["phi"]
     f = len(selected)
 
-    if f == 0:
-        return +1e9  # invalid
+    if f < params["f_min"]:
+        return 1e9 
 
     # COST
-    cost = sum(phi[i] for i in selected) * T
+    cost = sum(phi[i] for i in selected) / T
 
     # SECURITY
     security = params["tau"] * (f ** params["i"])
@@ -92,12 +92,26 @@ def fitness(chromosome, params):
     )
 
     # NORMALIZATION
-    cost_n = (cost - params["cost_min"]) / (params["cost_max"] - params["cost_min"] + 1e-9)
-    lat_n = (latency - params["lat_min"]) / (params["lat_max"] - params["lat_min"] + 1e-9)
+    # ----- Log normalization for Cost -----
+    cost_log_actual = np.log(cost)
+    cost_log_min = np.log(params["cost_min"])
+    cost_log_max = np.log(params["cost_max"])
+    cost_n = (cost_log_actual - cost_log_min) / (cost_log_max - cost_log_min + 1e-9)
 
-    sec_raw = (security - params["sec_min"]) / (params["sec_max"] - params["sec_min"] + 1e-9)
-    sec_n = 1 - sec_raw
+    # ----- Log normalization for Latency -----
+    lat_log_actual = np.log(latency)
+    lat_log_min = np.log(params["lat_min"])
+    lat_log_max = np.log(params["lat_max"])
+    lat_n = (lat_log_actual - lat_log_min) / (lat_log_max - lat_log_min + 1e-9)
 
+    # ----- Log normalization for Security (then invert) -----
+    sec_log_actual = np.log(security)
+    sec_log_min = np.log(params["sec_min"])
+    sec_log_max = np.log(params["sec_max"])
+    sec_raw = (sec_log_actual - sec_log_min) / (sec_log_max - sec_log_min + 1e-9)
+    sec_n = 1 - sec_raw   # because security is to be maximized
+
+    # Finally, the overall objective (to minimize)
     obj = params["w1"] * lat_n + params["w2"] * sec_n + params["w3"] * cost_n
 
     return obj
@@ -310,8 +324,8 @@ def solve_gap_file(filename):
         # Sort phi
         phi_sorted = np.sort(phi)
         # COST
-        cost_max = np.sum(phi) * params["t_max"]
-        cost_min = np.sum(phi_sorted[:params["f_min"]]) * params["t_min"]
+        cost_max = np.sum(phi) / params["t_min"]
+        cost_min = np.sum(phi_sorted[:params["f_min"]]) / params["t_max"]
 
         
         # security min,max calculation
@@ -404,12 +418,12 @@ def solve_gap_file(filename):
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || BCGA || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.title(f"CONVERGENCE PLOT || BCGA || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_penalty_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -451,7 +465,6 @@ def solve_multiple_files(file_list,base_dir="bco_dataset"):
 # ==========================================================
 files = [
     "bco1.txt",
-    "bco2.txt", 
 ]
 
 
