@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 300
-GENERATIONS = 100
+GENERATIONS = 200
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
@@ -45,8 +45,6 @@ def decode_chromosome(chromosome, params):
     N = params["N"]
     t_min = params["t_min"]
     t_max = params["t_max"]
-
-    # num_bits_T = int(np.ceil(np.log2(t_max)))
 
     number_of_validators = chromosome[:N]
     T_bits = chromosome[N:]
@@ -423,7 +421,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_convergence.png", dpi=300)
         plt.show()
 
         # Store results

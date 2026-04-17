@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 300
-ITERATIONS = 100
+ITERATIONS = 200
 INTERTIA = 0.7
 C1 = 1.5
 C2 = 1.5
@@ -382,7 +382,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_PSO_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_PSO_convergence.png", dpi=300)
         plt.show()
 
         # Store results

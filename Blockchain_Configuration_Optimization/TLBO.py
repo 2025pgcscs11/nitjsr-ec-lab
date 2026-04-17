@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # ==========================================================
 POP_SIZE = 300
 ITERATIONS = 100
-TEACHING_FACTOR = 2
+TEACHING_FACTOR = 1
 
 
 # ==========================================================
@@ -383,7 +383,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_TLBO_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_TLBO_convergence.png", dpi=300)
         plt.show()
 
         # Store results

@@ -10,9 +10,12 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 300
-GENERATIONS = 100
+GENERATIONS = 200
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
+SBX_DISTRIBUTION_INDEX = 20
+POLYNOMIAL_MUTATION_INDEX = 20 
+
 
 # ==========================================================
 # INITIAL POPULATION (BINARY + REAL ENCODED)
@@ -21,19 +24,19 @@ def generate_initial_population(params):
     N = params["N"]
     t_min = params["t_min"]
     t_max = params["t_max"]
-
-    num_bits_T = int(np.ceil(np.log2(t_max - t_min + 1)))
-
     population = []
-
     for _ in range(POP_SIZE):
-        number_of_validators = np.random.randint(0, 2, size=N)
+        # Binary part: N bits for validators
+        validator_bits = np.random.randint(0, 2, size=N)
 
-        T = np.random.randint(t_min, t_max + 1)
+        # Real part: single float for T
+        T = np.random.uniform(t_min, t_max)
+        
+        # Chromosome = concatenation of binary array and float
+        chromosome = np.concatenate([validator_bits.astype(float), [T]])
 
-        chromosome = np.concatenate([number_of_validators, T])
         population.append(chromosome)
-
+    
     return np.array(population)
 
 
@@ -45,24 +48,19 @@ def decode_chromosome(chromosome, params):
     t_min = params["t_min"]
     t_max = params["t_max"]
 
-    # num_bits_T = int(np.ceil(np.log2(t_max)))
-
-    number_of_validators = chromosome[:N]
-    T = chromosome[N:]
-
-
-    # T = t_min + ((t_max - t_min) / ((2 ** num_bits_T) -1)) * T
-    # T = np.clip(T, t_min, t_max)
-    max_val = (2 ** len(T_bits)) - 1
-    T = t_min + int((T / max_val) * (t_max - t_min))
-
-    selected = np.where(number_of_validators == 1)[0]
-
+    # First N entries are binary (0/1) for validators
+    validator_bits = chromosome[:N]
+    selected = np.where(validator_bits >= 0.5)[0]   # threshold 0.5
+    
+    # Last entry is T (real)
+    T = chromosome[-1]
+    T = int(round(np.clip(T, t_min, t_max)))
+    
     return selected, T
 
 
 # ==========================================================
-# FITNESS FUNCTION (Minimization with Penalty)
+# FITNESS FUNCTION (Minimization)
 # ==========================================================
 def fitness(chromosome, params):
     selected, T = decode_chromosome(chromosome, params)
@@ -152,95 +150,163 @@ def binary_tournament_selection(population, fitness_values, k=2, problem="min"):
     return np.array(mating_pool)
 
 
-
 # ==========================================================
-# CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
+# BINARY CROSSOVER (for validator bits) – e.g., single-point
 # ==========================================================
-def crossover(p1, p2):
+def binary_crossover(parent1_bits, parent2_bits):
     if np.random.rand() < CROSSOVER_RATE:
-        point = np.random.randint(1, len(p1) - 2)
-        return (
-        np.concatenate((p1[:point], p2[point:])),
-        np.concatenate((p2[:point], p1[point:]))
-        )
-    return p1.copy(), p2.copy()
+        point = np.random.randint(1, len(parent1_bits))
+        child1_bits = np.concatenate((parent1_bits[:point], parent2_bits[point:]))
+        child2_bits = np.concatenate((parent2_bits[:point], parent1_bits[point:]))
+        return child1_bits, child2_bits
+    return parent1_bits.copy(), parent2_bits.copy()
 
 
 # ==========================================================
-# MUTATION IN A CHROMOSOME (BIT-WISE)
+# BINARY MUTATION (for validator bits)
 # ==========================================================
-def mutate(chromosome):
-    chromosome = chromosome.copy()  
-    for i in range(len(chromosome)):
+def binary_mutation(bits):
+    for i in range(len(bits)):
         if np.random.rand() < MUTATION_RATE:
-            chromosome[i] ^= 1
-    return chromosome
+            bits[i] = 1 - bits[i]
+    return bits
 
 
 # ==========================================================
-# BINARY-CODED GENETIC ALGORITHM
+# REAL SBX CROSSOVER (for T)
 # ==========================================================
-def binary_coded_genetic_algorithm(params):
+def real_sbx_crossover(t1, t2, t_min, t_max):
+    if np.random.rand() >= CROSSOVER_RATE:
+        return t1, t2
+    u = np.random.rand()
+    if u <= 0.5:
+        beta = (2 * u) ** (1.0 / (SBX_DISTRIBUTION_INDEX + 1))
+    else:
+        beta = (1 / (2 * (1 - u))) ** (1.0 / (SBX_DISTRIBUTION_INDEX + 1))
+    child1 = 0.5 * ((1 + beta) * t1 + (1 - beta) * t2)
+    child2 = 0.5 * ((1 - beta) * t1 + (1 + beta) * t2)
+    child1 = np.clip(child1, t_min, t_max)
+    child2 = np.clip(child2, t_min, t_max)
+    return child1, child2
+
+
+# ==========================================================
+# REAL POLYNOMIAL MUTATION (for T)
+# ==========================================================
+def real_polynomial_mutation(t, t_min, t_max):
+    if np.random.rand() >= MUTATION_RATE:
+        return t
+    delta = 0.0
+    r = np.random.rand()
+    if r < 0.5:
+        delta = (2 * r) ** (1.0 / (POLYNOMIAL_MUTATION_INDEX + 1)) - 1
+    else:
+        delta = 1 - (2 * (1 - r)) ** (1.0 / (POLYNOMIAL_MUTATION_INDEX + 1))
+    t_new = t + delta * (t_max - t_min)
+    return np.clip(t_new, t_min, t_max)
+
+
+# ==========================================================
+# CROSSOVER (handles both parts)
+# ==========================================================
+def crossover(parent1, parent2, params):
+    if np.random.rand() >= CROSSOVER_RATE:
+        return parent1.copy(), parent2.copy()
+    
+    N = params["N"]
+    t_min = params["t_min"]
+    t_max = params["t_max"]
+    # Split: first N bits = validator part, last element = T
+    p1_bits = parent1[:N]
+    p2_bits = parent2[:N]
+    p1_T = parent1[-1]
+    p2_T = parent2[-1]
+    # Binary crossover for validator bits
+    c1_bits, c2_bits = binary_crossover(p1_bits, p2_bits)
+    # Real crossover for T
+    c1_T, c2_T = real_sbx_crossover(p1_T, p2_T, t_min, t_max)
+    # Rebuild children
+    child1 = np.concatenate([c1_bits, [c1_T]])
+    child2 = np.concatenate([c2_bits, [c2_T]])
+    return child1, child2
+
+
+# ==========================================================
+# MUTATION (handles both parts)
+# ==========================================================
+def mutate(chromosome, params):
+    N = params["N"]
+    t_min = params["t_min"]
+    t_max = params["t_max"]
+    # Mutate validator bits
+    mutated_bits = binary_mutation(chromosome[:N].copy())
+    # Mutate T
+    mutated_T = real_polynomial_mutation(chromosome[-1], t_min, t_max)
+    return np.concatenate([mutated_bits, [mutated_T]])
+
+
+# ==========================================================
+# GENETIC ALGORITHM MAIN LOOP (Hybrid)
+# ==========================================================
+def hybrid_genetic_algorithm(params):
     # Generate Initial Population
     population = generate_initial_population(params)
 
     # Evaluate fitness values
-    fitness_values = [fitness(chromosome, params) for chromosome in population]
-
+    fitness_values = [fitness(chrom, params) for chrom in population]
+    
     # Store best chromosome and its fitness value
     best_idx = np.argmin(fitness_values)
-    best_solution = population[best_idx]
+    best_solution = population[best_idx].copy()
     best_fitness = fitness_values[best_idx]
-    
-    # Best Fitness per generation
+
+     # Best Fitness per generation
     best_fitness_per_gen = []
 
 
     for gen in range(GENERATIONS):
-        mating_pool = binary_tournament_selection(population,fitness_values)
-        offspring_population = []
-
-        # CROSSOVER
+        mating_pool = binary_tournament_selection(population, fitness_values)
+        offspring = []
         for i in range(POP_SIZE // 2):
+            # SELECTION
             p1, p2 = mating_pool[np.random.choice(len(mating_pool), 2, replace=False)]
-            c1, c2 = crossover(p1, p2)
+            
+            # CROSSOVER
+            c1, c2 = crossover(p1, p2, params)
+            
+            # MUTATION
+            c1 = mutate(c1, params)
+            c2 = mutate(c2, params)
 
-            # offsprings are added
-            offspring_population.append(c1)
-            offspring_population.append(c2)
-        
+            # Offsprings are added
+            offspring.extend([c1, c2])
 
-        # MUTATION
-        for i in range(len(offspring_population)):
-            offspring_population[i] = mutate(offspring_population[i])
-        
-    
         # Evaluate offspring fitness 
-        offspring_fitness = [fitness(ind, params) for ind in offspring_population]
+        offspring_fitness = [fitness(ind, params) for ind in offspring]
 
-        # Combine
-        combined_population = list(population) + offspring_population
-        combined_fitness = list(fitness_values) + offspring_fitness
+        # Combine and select best POP_SIZE
+        combined_pop = list(population) + offspring
+        combined_fit = list(fitness_values) + offspring_fitness
 
         # Sort
-        sorted_indices = np.argsort(combined_fitness)
-
-        # Select next generation
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
-
+        sorted_idx = np.argsort(combined_fit)
+        population = [combined_pop[i] for i in sorted_idx[:POP_SIZE]]
+        fitness_values = [combined_fit[i] for i in sorted_idx[:POP_SIZE]]
+        
         # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
-        best_fitness_per_gen.append(gen_best_fitness)
-
+        gen_best = min(fitness_values)
+        
+        best_fitness_per_gen.append(gen_best)
+        
         # Update global best
-        if gen_best_fitness < best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = population[0]
+        if gen_best < best_fitness:
+            best_fitness = gen_best
+            best_solution = population[0].copy()
+        
 
         # val, T =decode_chromosome(population[0],params)
         # print(f"Generation {gen+1}:  Best Fitness = {gen_best_fitness}    Number of Validators = {len(val)}   Number of Transactions = {T}")
-
+    
     return best_solution, best_fitness, best_fitness_per_gen
 
 
@@ -380,7 +446,7 @@ def solve_gap_file(filename):
         for run in range(num_runs):
             start_time = time.perf_counter()
 
-            best_assignment, best_utility, fitness_per_gen = binary_coded_genetic_algorithm(params)
+            best_assignment, best_utility, fitness_per_gen = hybrid_genetic_algorithm(params)
 
             end_time = time.perf_counter()
 
@@ -414,12 +480,12 @@ def solve_gap_file(filename):
 
         plt.xlabel("Generation")
         plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || BCGA || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
+        plt.title(f"CONVERGENCE PLOT || Hybrid GA || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_penalty_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_Hybrid_GA_convergence.png", dpi=300)
         plt.show()
 
         # Store results

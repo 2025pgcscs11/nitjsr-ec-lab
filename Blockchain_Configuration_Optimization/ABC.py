@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 300
-ITERATIONS = 100
-LIMIT = 10
+ITERATIONS = 200
+LIMIT = 100
 
 
 # ==========================================================
@@ -264,9 +264,15 @@ def artificial_bee_colony_optimization(params):
         # val, T =decode_chromosome(population[0],params)
         # print(f"Iteration {gen+1}:  Best Fitness = {gen_best_fitness}  Number of Validators = {len(val)}   Number of Transactions = {T}")
         
-        # ==================================================
+        # Elitism: ensure best solution survives 
+        worst_idx = np.argmin(fitness_values)
+        if best_fitness > fitness_values[worst_idx]:
+            population[worst_idx] = best_solution.copy()
+            utility_function_values[worst_idx] = best_utility_function_value
+            fitness_values[worst_idx] = best_fitness
+        
+
         # GLOBAL BEST UPDATE
-        # ==================================================
         if fitness_values[gen_best_index] > best_fitness:
             best_fitness = fitness_values[gen_best_index]
             best_solution = population[gen_best_index].copy()
@@ -451,7 +457,7 @@ def solve_gap_file(filename):
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_ABC_convergence.png", dpi=300)
+        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_ABC_convergence.png", dpi=300)
         plt.show()
 
         # Store results

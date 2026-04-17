@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 500
+POP_SIZE = 300
 ITERATIONS = 200
 SCALING_FACTOR = 0.85
 CROSSOVER_RATE = 0.8
