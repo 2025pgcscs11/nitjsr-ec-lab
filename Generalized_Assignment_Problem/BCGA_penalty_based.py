@@ -377,7 +377,6 @@ def solve_gap_file(filename):
             "best_cost_per_run": all_best_costs,
             "best_solution_per_run": all_best_sol,
             "time_per_run": all_times,
-            "time_per_run": all_times,
             "R": R,
             "B": B
         })

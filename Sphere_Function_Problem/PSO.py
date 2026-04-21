@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-ITERATIONS = 100
+POP_SIZE = 100
+ITERATIONS = 200
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
@@ -92,18 +92,16 @@ def particle_swarm_optimization():
                 p_best[i] =population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Iteration best
-        gen_best = np.min(f_p_best)
-        best_fitness_per_gen.append(gen_best)
-
-        # print(f"Generation {gen+1}: Iteration Best = {gen_best}")
 
         # Global best update 
         best_index = np.argmin(f_p_best)
         if f_p_best[best_index] < f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
+        
 
+        best_fitness_per_gen.append(f_g_best)
+        # print(f"Generation {gen+1}: Iteration Best = {f_g_best}")
 
     return g_best, f_g_best, best_fitness_per_gen
 
@@ -112,30 +110,32 @@ def particle_swarm_optimization():
 # MULTIPLE RUNS
 # ==========================================================
 def solve_square_function():
-
+    results = []
     num_runs = 20
 
     all_histories = []
+    all_best_values = []
     all_best_sol = []
-    all_best_costs = []
+    all_best_Values = []
     all_times = []
 
     for run in range(num_runs):
 
         start_time = time.perf_counter()
 
-        best_sol, best_cost, history = particle_swarm_optimization()
+        best_sol, best_value, history = particle_swarm_optimization()
 
         end_time = time.perf_counter()
 
         run_time = end_time - start_time
 
         all_histories.append(history)
+        all_best_values.append(best_value)
         all_best_sol.append(best_sol)
-        all_best_costs.append(best_cost)
+        all_best_Values.append(best_value)
         all_times.append(run_time)
 
-        print(f"Run {run+1}: Best Cost = {best_cost:.6f}, Time = {run_time:.4f} sec")
+        print(f"Run {run+1}: Best Value = {best_value:.6f}, Time = {run_time:.4f} sec")
 
     all_histories = np.array(all_histories)
     avg_curve = np.mean(all_histories, axis=0)
@@ -152,7 +152,7 @@ def solve_square_function():
     plt.plot(avg_curve, linewidth=2, label="Average")
 
     plt.xlabel("Generation")
-    plt.ylabel("Best Cost (Min)")
+    plt.ylabel("Best Value (Min)")
     plt.title("PSO Convergence (Sphere Function)")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
@@ -162,9 +162,35 @@ def solve_square_function():
     plt.savefig("plots/PSO_convergence.png", dpi=300)
     plt.show()
 
+    # Store results
+    results.append({
+        "histories": all_histories,
+        "best_Value_per_run": all_best_values,
+        "best_solution_per_run": all_best_sol,
+        "time_per_run": all_times,
+    })
+
+    return results
+
 
 # ==========================================================
 # MAIN
 # ==========================================================
 if __name__ == "__main__":
-    solve_square_function()
+    all_results = solve_square_function()
+
+    for result in all_results:
+
+        best_values = np.array(result["best_Value_per_run"])
+        times = np.array(result["time_per_run"])
+
+        print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
+
+        print(f"Number of runs        : {len(best_values)}")
+        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
+        print(f"Worst fitness         : {np.max(best_values):.6f}")
+        print(f"Average fitness       : {np.mean(best_values):.6f}")
+        print(f"Std deviation         : {np.std(best_values):.6f}")
+
+        print(f"\nAverage time/run      : {np.mean(times):.4f} sec")
+        print(f"Total execution time  : {np.sum(times):.4f} sec")

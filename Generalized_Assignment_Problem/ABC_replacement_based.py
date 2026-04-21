@@ -57,11 +57,10 @@ def generate_feasible_solution(C, R, B):
 # ==========================================================
 # OBJECTIVE FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(food_source, C, R, B, penalty_weight=1000):
+def fitness(food_source, C, R):
     cost = 0
-    penalty = 0
 
-    m = len(B)
+    m = len(C)
     resource_used = [0] * m
     
     agents = food_source.astype(int)
@@ -70,11 +69,7 @@ def fitness(food_source, C, R, B, penalty_weight=1000):
         cost += C[agent][j]
         resource_used[agent] += R[agent][j]
 
-    for a in range(m):
-        if resource_used[a] > B[a]:
-            penalty += (resource_used[a] - B[a])
-
-    return cost - penalty_weight * penalty
+    return cost
 
 
 # ==========================================================
@@ -111,7 +106,7 @@ def artificial_bee_colony_opimization(C, R, B):
 
     # Evaluate fitness of the population
     fitness_values = np.array([
-        fitness(population[i],C,R,B)
+        fitness(population[i],C,R)
         for i in range(POP_SIZE)
     ])
 
@@ -153,7 +148,7 @@ def artificial_bee_colony_opimization(C, R, B):
                 x_new = generate_feasible_solution(C,R,B)
 
             # Evaluate the objective function and fitness of newly generated solution
-            f_new = fitness(x_new,C,R,B)
+            f_new = fitness(x_new,C,R)
 
             # Greedy selection and food_source vector updation
             if f_new > fitness_values[i]:
@@ -202,7 +197,7 @@ def artificial_bee_colony_opimization(C, R, B):
                     x_new = generate_feasible_solution(C,R,B)
 
                 # Evaluate the objective function and fitness of newly generated solution
-                f_new = fitness(x_new,C,R,B)
+                f_new = fitness(x_new,C,R)
 
 
                 # Greedy selection and food_source vector updation
@@ -223,9 +218,17 @@ def artificial_bee_colony_opimization(C, R, B):
         ##################################
         #   Memorize the Best solution   #
         ##################################
-        best_index = np.argmax(fitness_values)
-        best_solution = population[best_index].copy()
-        best_fitness = fitness_values[best_index].copy()
+        current_best_index = np.argmax(fitness_values)
+        current_best_fitness = fitness_values[current_best_index]
+
+        # Update only if better
+        if current_best_fitness > best_fitness:
+            best_fitness = current_best_fitness
+            best_solution = population[current_best_index].copy()
+
+        # Store global best (not current best)
+        best_fitness_value_per_gen.append(best_fitness)
+        # print(f"Generation {gen+1}: Best Objective Function Value = {best_fitness}")
         
 
         ##################################
@@ -241,7 +244,7 @@ def artificial_bee_colony_opimization(C, R, B):
                     x_new = generate_feasible_solution(C, R, B)
 
                 # Evaluate the objective function and fitness of newly generated solution and assign it
-                f_new = fitness(x_new,C,R,B)
+                f_new = fitness(x_new,C,R)
 
 
                 population[i] = x_new
@@ -249,22 +252,6 @@ def artificial_bee_colony_opimization(C, R, B):
 
                 # Reset food_source vector
                 trial_vector[i] = 0
-
-
-
-        #  Iteration Best
-        gen_best_index = np.argmax(fitness_values)
-        gen_best_solution = population[gen_best_index].copy()
-        gen_best_fitness = fitness_values[gen_best_index]
-
-        best_fitness_value_per_gen.append(gen_best_fitness)
-        
-        # print(f"Generation {gen+1}: Best Objective Function Value = {gen_best_fitness_value}")
-
-        # Global Best Update
-        if gen_best_fitness > best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = gen_best_solution.copy()
 
 
     return best_solution, best_fitness, best_fitness_value_per_gen
@@ -337,12 +324,14 @@ def solve_gap_file(filename):
 
             run_time = end_time - start_time
 
+            feasible = is_feasible(best_assignment,R,B)
+
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
             all_best_costs.append(best_cost)
             all_times.append(run_time)
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec, Feasible = {feasible}")
 
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)

@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-ITERATIONS = 100
+POP_SIZE = 100
+ITERATIONS = 300
 INTERTIA = 0.7
 C1 = 1.5
 C2 = 1.5
@@ -206,17 +206,16 @@ def particle_swarm_optimization(C, R, B):
                 p_best[i] = population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Iteration best
-        gen_best = np.max(fitness_values)
-        best_fitness_per_gen.append(gen_best)
-
-        # print(f"Generation {gen+1}: Iteration Best = {gen_best}")
 
         # Global best update 
         best_index = np.argmax(f_p_best)
         if f_p_best[best_index] > f_g_best:
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
+        
+        # Iteration best
+        best_fitness_per_gen.append(f_g_best)
+        # print(f"Generation {gen+1}: Iteration Best = {f_g_best}")
 
 
     return g_best, f_g_best, best_fitness_per_gen

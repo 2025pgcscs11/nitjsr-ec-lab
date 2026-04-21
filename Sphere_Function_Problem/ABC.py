@@ -10,11 +10,11 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 300
-ITERATIONS = 100
+ITERATIONS = 200
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
-LIMIT = 10 
+LIMIT = 100 
 
 
 # ==========================================================
@@ -192,59 +192,87 @@ def artificial_bee_colony_opimization():
 # MULTIPLE RUNS
 # ==========================================================
 def solve_square_function():
-        num_runs = 20
-        
-        all_histories = []
-        all_best_sol = []
-        all_best_costs = []
-        all_times = []
+    results = []
+    num_runs = 20
 
-        # Run DE multiple times
-        for run in range(num_runs):
-            start_time = time.perf_counter()
+    all_histories = []
+    all_best_values = []
+    all_best_sol = []
+    all_best_Values = []
+    all_times = []
 
-            best_assignment, best_cost, fitness_per_gen = artificial_bee_colony_opimization()
+    for run in range(num_runs):
 
-            end_time = time.perf_counter()
+        start_time = time.perf_counter()
 
-            run_time = end_time - start_time
+        best_sol, best_value, history = artificial_bee_colony_opimization()
 
-            all_histories.append(fitness_per_gen)
-            all_best_sol.append(best_assignment)
-            all_best_costs.append(best_cost)
-            all_times.append(run_time)
+        end_time = time.perf_counter()
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+        run_time = end_time - start_time
 
-        # Convert to numpy array for easier computation
-        all_histories = np.array(all_histories)
+        all_histories.append(history)
+        all_best_values.append(best_value)
+        all_best_sol.append(best_sol)
+        all_best_Values.append(best_value)
+        all_times.append(run_time)
 
-        # Compute average convergence
-        avg_fitness = np.mean(all_histories, axis=0)
+        print(f"Run {run+1}: Best Value = {best_value:.6f}, Time = {run_time:.4f} sec")
 
-        # Plot for THIS instance
-        plt.figure()
+    all_histories = np.array(all_histories)
+    avg_curve = np.mean(all_histories, axis=0)
 
-        # Plot all runs (light)
-        for i, history in enumerate(all_histories):
-            plt.plot(history, alpha=0.6, label=f"Run {i+1}")
+    # ==================================================
+    # PLOT
+    # ==================================================
+    plt.figure()
 
-        # Plot average (bold)
-        plt.plot(avg_fitness, linewidth=2, label="Average")
+    for i, history in enumerate(all_histories):
+        plt.plot(history, alpha=0.6, label=f"Run {i+1}")
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Cost (Min)")
-        plt.title("ABC Convergence (Sphere Function)")
-        plt.legend(loc='best')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/ABC_convergence.png", dpi=300)
-        plt.show()
+
+    plt.plot(avg_curve, linewidth=2, label="Average")
+
+    plt.xlabel("Generation")
+    plt.ylabel("Best Value (Min)")
+    plt.title("PSO Convergence (Sphere Function)")
+    plt.legend(loc='best')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    os.makedirs("plots", exist_ok=True)
+    plt.savefig("plots/PSO_convergence.png", dpi=300)
+    plt.show()
+
+    # Store results
+    results.append({
+        "histories": all_histories,
+        "best_Value_per_run": all_best_values,
+        "best_solution_per_run": all_best_sol,
+        "time_per_run": all_times,
+    })
+
+    return results
 
 
 # ==========================================================
 # MAIN
 # ==========================================================
 if __name__ == "__main__":
-    solve_square_function()
+    all_results = solve_square_function()
+
+    for result in all_results:
+
+        best_values = np.array(result["best_Value_per_run"])
+        times = np.array(result["time_per_run"])
+
+        print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
+
+        print(f"Number of runs        : {len(best_values)}")
+        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
+        print(f"Worst fitness         : {np.max(best_values):.6f}")
+        print(f"Average fitness       : {np.mean(best_values):.6f}")
+        print(f"Std deviation         : {np.std(best_values):.6f}")
+
+        print(f"\nAverage time/run      : {np.mean(times):.4f} sec")
+        print(f"Total execution time  : {np.sum(times):.4f} sec")

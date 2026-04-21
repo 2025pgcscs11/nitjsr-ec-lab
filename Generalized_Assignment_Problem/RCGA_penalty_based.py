@@ -25,6 +25,42 @@ def generate_initial_population(m,n):
    
     return np.array(population)
 
+# def generate_initial_population(m, n, resource, capacity):
+#     """
+#     m = number of agents
+#     n = number of tasks
+#     resource[m][n] = resource consumption
+#     capacity[m] = capacity of each agent
+#     """
+
+#     population = []
+
+#     while len(population) < POP_SIZE:
+#         chromosome = [-1] * n
+#         remaining_capacity = capacity.copy()
+
+#         task_order = np.random.permutation(n)
+#         feasible = True
+
+#         for task in task_order:
+#             feasible_agents = [
+#                 agent for agent in range(m)
+#                 if remaining_capacity[agent] >= resource[agent][task]
+#             ]
+
+#             if not feasible_agents:
+#                 feasible = False
+#                 break
+
+#             chosen_agent = np.random.choice(feasible_agents)
+#             chromosome[task] = chosen_agent
+#             remaining_capacity[chosen_agent] -= resource[chosen_agent][task]
+
+#         if feasible:
+#             population.append(chromosome)
+
+#     return np.array(population)
+
 
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)

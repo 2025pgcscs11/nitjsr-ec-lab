@@ -138,11 +138,6 @@ def particle_swarm_optimization(C, R, B):
                 p_best[i] =discrete_particle.copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Iteration best
-        gen_best = np.max(f_p_best)
-        best_fitness_per_gen.append(gen_best)
-
-        # print(f"Generation {gen+1}: Iteration Best = {gen_best}")
 
         # Global best update 
         best_index = np.argmax(f_p_best)
@@ -150,6 +145,9 @@ def particle_swarm_optimization(C, R, B):
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
 
+        # Iteration best
+        # print(f"Generation {gen+1}: Iteration Best = {f_g_best}")
+        best_fitness_per_gen.append(f_g_best)
 
     return g_best, f_g_best, best_fitness_per_gen
 

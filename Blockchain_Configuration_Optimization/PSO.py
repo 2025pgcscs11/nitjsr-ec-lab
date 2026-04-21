@@ -190,8 +190,8 @@ def particle_swarm_optimization(params):
                 f_p_best[i] = fitness_values[i]
 
         # Iteration best
-        gen_best = np.min(f_p_best)
-        best_fitness_per_gen.append(gen_best)
+        # gen_best = np.min(f_p_best)
+        # best_fitness_per_gen.append(gen_best)
 
         # val, T =decode_chromosome(population[0],params)
         # print(f"Iteration {gen+1}:  Best Fitness = {gen_best_fitness}  Number of Validators = {len(val)}   Number of Transactions = {T}")
@@ -202,6 +202,7 @@ def particle_swarm_optimization(params):
             g_best = p_best[best_index].copy()
             f_g_best = f_p_best[best_index]
 
+        best_fitness_per_gen.append(f_g_best)
 
     return g_best, f_g_best, best_fitness_per_gen
 

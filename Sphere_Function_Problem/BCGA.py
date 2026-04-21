@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-GENERATIONS = 100
+POP_SIZE = 100
+GENERATIONS = 200
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
@@ -47,7 +47,7 @@ def decode_chromosome(chromosome):
             value = (value << 1) | bit
 
         # Keep within bounds
-        precision = (UPPER_BOUND - LOWER_BOUND)/(2**num_bits -1)
+        precision = (UPPER_BOUND - LOWER_BOUND) / (2 ** num_bits -1)
         value = LOWER_BOUND + precision * value
 
         agents.append(value)
@@ -66,37 +66,31 @@ def fitness(chromosome):
 # ==========================================================
 # SELECT A PARENT 
 # ==========================================================
-def binary_tournament_selection(population, fitness, k=2, problem="min"):
+def binary_tournament_selection(population, fitness_values, k=2, problem="min"):
     Np = len(population)
     mating_pool = []
-    
-    # Track how many times each individual is selected
     selection_count = np.zeros(Np, dtype=int)
-
+    
     while len(mating_pool) < Np:
-        # Get valid candidates (selected less than 2 times)
-        valid_indices = np.where(selection_count < 2)[0]
-
-        # If not enough candidates for tournament, break
-        if len(valid_indices) < k:
-            break
-
-        # Step 1: Randomly pick k valid individuals
-        indices = np.random.choice(valid_indices, k, replace=False)
-
-        # Step 2: Get their fitness
-        selected_fitness = fitness[indices]
-
-        # Step 3: Select winner
-        if problem == "max":
-            winner_index = indices[np.argmax(selected_fitness)]
+        # Get indices that haven't reached max selections (2)
+        available = np.where(selection_count < 2)[0]
+        
+        if len(available) < k:
+            # Reset selection counts if not enough individuals
+            selection_count = np.zeros(Np, dtype=int)
+            available = np.where(selection_count < 2)[0]
+        
+        # Tournament selection
+        participants = np.random.choice(available, k, replace=False)
+        
+        if problem == "min":
+            winner = participants[np.argmin(fitness_values[participants])]
         else:
-            winner_index = indices[np.argmin(selected_fitness)]
-
-        # Step 4: Add to mating pool
-        mating_pool.append(population[winner_index])
-        selection_count[winner_index] += 1
-
+            winner = participants[np.argmax(fitness_values[participants])]
+        
+        mating_pool.append(population[winner])
+        selection_count[winner] += 1
+    
     return np.array(mating_pool)
 
 
@@ -195,19 +189,19 @@ def binary_coded_genetic_algorithm():
 # MULTIPLE RUNS
 # ==========================================================
 def solve_square_function():
-
+    results = []
     num_runs = 20
 
     all_histories = []
     all_best_sol = []
-    all_best_costs = []
+    all_best_values = []
     all_times = []
 
     for run in range(num_runs):
 
         start_time = time.perf_counter()
 
-        best_sol, best_cost, history = binary_coded_genetic_algorithm()
+        best_sol, best_value, history = binary_coded_genetic_algorithm()
 
         end_time = time.perf_counter()
 
@@ -215,10 +209,10 @@ def solve_square_function():
 
         all_histories.append(history)
         all_best_sol.append(best_sol)
-        all_best_costs.append(best_cost)
+        all_best_values.append(best_value)
         all_times.append(run_time)
 
-        print(f"Run {run+1}: Best Cost = {best_cost:.6f}, Time = {run_time:.4f} sec")
+        print(f"Run {run+1}: Best value = {best_value:.6f}, Time = {run_time:.4f} sec")
 
     all_histories = np.array(all_histories)
     avg_curve = np.mean(all_histories, axis=0)
@@ -235,7 +229,7 @@ def solve_square_function():
     plt.plot(avg_curve, linewidth=2, label="Average")
 
     plt.xlabel("Generation")
-    plt.ylabel("Best Cost (Min)")
+    plt.ylabel("Best value (Min)")
     plt.title("BCGA Convergence (Sphere Function)")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
@@ -245,9 +239,36 @@ def solve_square_function():
     plt.savefig("plots/BCGA_convergence.png", dpi=300)
     plt.show()
 
+    # Store results
+    results.append({
+        "histories": all_histories,
+        "best_cost_per_run": all_best_values,
+        "best_solution_per_run": all_best_sol,
+        "time_per_run": all_times,
+    })
+
+    return results
+
+
 
 # ==========================================================
 # MAIN
 # ==========================================================
 if __name__ == "__main__":
-    solve_square_function()
+    all_results = solve_square_function()
+
+    for result in all_results:
+
+        best_values = np.array(result["best_cost_per_run"])
+        times = np.array(result["time_per_run"])
+
+        print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
+
+        print(f"Number of runs        : {len(best_values)}")
+        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
+        print(f"Worst fitness         : {np.max(best_values):.6f}")
+        print(f"Average fitness       : {np.mean(best_values):.6f}")
+        print(f"Std deviation         : {np.std(best_values):.6f}")
+
+        print(f"\nAverage time/run      : {np.mean(times):.4f} sec")
+        print(f"Total execution time  : {np.sum(times):.4f} sec")

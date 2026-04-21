@@ -241,6 +241,22 @@ def artificial_bee_colony_optimization(params):
             i = (i + 1) % POP_SIZE
 
 
+        ##################################
+        #   Memorize the Best solution   #
+        ##################################
+        current_best_index = np.argmax(fitness_values)
+        current_best_fitness = fitness_values[current_best_index]
+        current_utility_function_value = utility_function_values[current_best_index]
+
+        # Update only if better
+        if current_best_fitness > best_fitness:
+            best_fitness = current_best_fitness
+            best_utility_function_value = current_utility_function_value
+            best_solution = population[current_best_index].copy()
+
+        # Store global best (not current best)
+        best_utility_function_value_per_gen.append(best_utility_function_value)
+
         # ==================================================
         # SCOUT BEE PHASE
         # ==================================================
@@ -256,28 +272,7 @@ def artificial_bee_colony_optimization(params):
                 utility_function_values[i] = utility_function(x_new, params)
                 fitness_values[i] = fitness(utility_function_values[i])
                 trial_vector[i] = 0
-
-        gen_best_index = np.argmax(fitness_values)
-        # Store history
-        best_utility_function_value_per_gen.append(utility_function_values[gen_best_index])
-
-        # val, T =decode_chromosome(population[0],params)
-        # print(f"Iteration {gen+1}:  Best Fitness = {gen_best_fitness}  Number of Validators = {len(val)}   Number of Transactions = {T}")
-        
-        # Elitism: ensure best solution survives 
-        worst_idx = np.argmin(fitness_values)
-        if best_fitness > fitness_values[worst_idx]:
-            population[worst_idx] = best_solution.copy()
-            utility_function_values[worst_idx] = best_utility_function_value
-            fitness_values[worst_idx] = best_fitness
-        
-
-        # GLOBAL BEST UPDATE
-        if fitness_values[gen_best_index] > best_fitness:
-            best_fitness = fitness_values[gen_best_index]
-            best_solution = population[gen_best_index].copy()
-            best_utility_function_value = utility_function_values[gen_best_index]
-
+                
 
     return best_solution, best_utility_function_value, best_utility_function_value_per_gen
 

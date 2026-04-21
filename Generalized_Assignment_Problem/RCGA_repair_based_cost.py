@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-GENERATIONS = 100
+POP_SIZE = 100
+GENERATIONS = 300
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 DISTRIBUTIOIN_INDEX = 20
@@ -349,12 +349,15 @@ def solve_gap_file(filename):
 
             run_time = end_time - start_time
 
+            feasible = is_feasible(best_assignment,R,B)
+
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
             all_best_costs.append(best_cost)
             all_times.append(run_time)
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec, Feasible = {feasible}")
+
 
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)

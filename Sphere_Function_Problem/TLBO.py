@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-ITERATIONS = 100
+POP_SIZE = 100
+ITERATIONS = 20
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
-TEACHING_FACTOR = 2
+TEACHING_FACTOR = 1
 
 
 # ==========================================================
@@ -22,7 +22,7 @@ TEACHING_FACTOR = 2
 # ==========================================================
 def generate_initial_population():
     # generate population matrix of pop_size * dimension within the range of 
-    return np.random.randint(LOWER_BOUND,UPPER_BOUND, size=(POP_SIZE,DIMENSION))
+    return np.random.uniform(LOWER_BOUND, UPPER_BOUND, size=(POP_SIZE,DIMENSION))
 
 
 # ==========================================================
@@ -75,7 +75,7 @@ def teaching_learning_based_optimization():
 
             # Generate new solution
             x_new = population[i] + r1 * (x_best - TEACHING_FACTOR * x_mean)
-            x_new = np.clip(np.round(x_new), LOWER_BOUND, UPPER_BOUND)
+            x_new = np.clip(x_new, LOWER_BOUND, UPPER_BOUND)
 
             f_x_new = fitness(x_new)
 
@@ -101,7 +101,7 @@ def teaching_learning_based_optimization():
             else:
                 x_new = population[i] - r2 * (population[i] - x_p)
 
-            x_new = np.clip(np.round(x_new), LOWER_BOUND, UPPER_BOUND)
+            x_new = np.clip(x_new, LOWER_BOUND, UPPER_BOUND)
             f_x_new = fitness(x_new)
 
             # Greedy selection
@@ -130,30 +130,32 @@ def teaching_learning_based_optimization():
 # ITERATE OVER 20 RUNS
 # ==================================================================
 def solve_square_function():
-
+    results = []
     num_runs = 20
 
     all_histories = []
+    all_best_values = []
     all_best_sol = []
-    all_best_costs = []
+    all_best_Values = []
     all_times = []
 
     for run in range(num_runs):
 
         start_time = time.perf_counter()
 
-        best_sol, best_cost, history = teaching_learning_based_optimization()
+        best_sol, best_value, history = teaching_learning_based_optimization()
 
         end_time = time.perf_counter()
 
         run_time = end_time - start_time
 
         all_histories.append(history)
+        all_best_values.append(best_value)
         all_best_sol.append(best_sol)
-        all_best_costs.append(best_cost)
+        all_best_Values.append(best_value)
         all_times.append(run_time)
 
-        print(f"Run {run+1}: Best Cost = {best_cost:.6f}, Time = {run_time:.4f} sec")
+        print(f"Run {run+1}: Best Value = {best_value:.6f}, Time = {run_time:.4f} sec")
 
     all_histories = np.array(all_histories)
     avg_curve = np.mean(all_histories, axis=0)
@@ -170,7 +172,7 @@ def solve_square_function():
     plt.plot(avg_curve, linewidth=2, label="Average")
 
     plt.xlabel("Generation")
-    plt.ylabel("Best Cost (Min)")
+    plt.ylabel("Best Value (Min)")
     plt.title("TLBO Convergence (Sphere Function)")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
@@ -180,9 +182,35 @@ def solve_square_function():
     plt.savefig("plots/TLBO_convergence.png", dpi=300)
     plt.show()
 
+    # Store results
+    results.append({
+        "histories": all_histories,
+        "best_Value_per_run": all_best_values,
+        "best_solution_per_run": all_best_sol,
+        "time_per_run": all_times,
+    })
+
+    return results
+
 
 # ==========================================================
-# EXECUTION STARTS HERE
+# MAIN
 # ==========================================================
-if __name__ == "__main__": 
-    solve_square_function()
+if __name__ == "__main__":
+    all_results = solve_square_function()
+
+    for result in all_results:
+
+        best_values = np.array(result["best_Value_per_run"])
+        times = np.array(result["time_per_run"])
+
+        print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
+
+        print(f"Number of runs        : {len(best_values)}")
+        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
+        print(f"Worst fitness         : {np.max(best_values):.6f}")
+        print(f"Average fitness       : {np.mean(best_values):.6f}")
+        print(f"Std deviation         : {np.std(best_values):.6f}")
+
+        print(f"\nAverage time/run    : {np.mean(times):.4f} sec")
+        print(f"Total execution time  : {np.sum(times):.4f} sec")

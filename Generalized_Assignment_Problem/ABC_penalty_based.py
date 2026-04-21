@@ -183,10 +183,17 @@ def artificial_bee_colony_opimization(C, R, B):
         ##################################
         #   Memorize the Best solution   #
         ##################################
-        best_index = np.argmin(fitness_values)
-        best_solution = population[best_index].copy()
-        best_fitness = fitness_values[best_index].copy()
-        
+        current_best_index = np.argmax(fitness_values)
+        current_best_fitness = fitness_values[current_best_index]
+
+        # Update only if better
+        if current_best_fitness > best_fitness:
+            best_fitness = current_best_fitness
+            best_solution = population[current_best_index].copy()
+
+        # Store global best (not current best)
+        best_fitness_value_per_gen.append(best_fitness)
+        # print(f"Generation {gen+1}: Best Objective Function Value = {best_fitness}")
 
         ##################################
         #     Scout Bee Phase            #
@@ -205,22 +212,6 @@ def artificial_bee_colony_opimization(C, R, B):
 
                 # Reset food_source vector
                 trial_vector[i] = 0
-
-
-
-        #  Iteration Best
-        gen_best_index = np.argmin(fitness_values)
-        gen_best_solution = population[gen_best_index].copy()
-        gen_best_fitness = fitness_values[gen_best_index]
-
-        best_fitness_value_per_gen.append(gen_best_fitness)
-        
-        # print(f"Generation {gen+1}: Best Objective Function Value = {gen_best_fitness_value}")
-
-        # Global Best Update
-        if gen_best_fitness < best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = gen_best_solution.copy()
 
 
     return best_solution, best_fitness, best_fitness_value_per_gen
@@ -293,13 +284,15 @@ def solve_gap_file(filename):
 
             run_time = end_time - start_time
 
+            feasible = is_feasible(best_assignment,R,B)
+
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
             all_best_costs.append(best_cost)
             all_times.append(run_time)
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
-
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec, Feasible = {feasible}")
+            
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)
 
