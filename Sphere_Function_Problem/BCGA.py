@@ -93,6 +93,34 @@ def binary_tournament_selection(population, fitness_values, k=2, problem="min"):
     
     return np.array(mating_pool)
 
+# def k_tournament_selection(population, fitness_values, k=2, problem="min"):
+#     Np = len(population)
+#     mating_pool = []
+
+#     selection_count = np.zeros(Np, dtype=int)
+
+#     for _ in range(Np):
+#         # pick k participants who have been selected < k times
+#         participants = []
+
+#         while len(participants) < k:
+#             idx = np.random.randint(0, Np)
+#             if selection_count[idx] < k and idx not in participants:
+#                 participants.append(idx)
+#                 selection_count[idx] += 1
+
+#         participants = np.array(participants)
+
+#         # choose winner
+#         if problem == "min":
+#             winner = participants[np.argmin(fitness_values[participants])]
+#         else:
+#             winner = participants[np.argmax(fitness_values[participants])]
+
+#         mating_pool.append(population[winner])
+
+#     return np.array(mating_pool)
+
 
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
