@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 100
-ITERATIONS = 200
+ITERATIONS = 15
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
@@ -141,31 +141,44 @@ def solve_square_function():
     avg_curve = np.mean(all_histories, axis=0)
 
     # ==================================================
-    # PLOT
+    # PLOT WITH CONVERGENCE THRESHOLD
     # ==================================================
     plt.figure()
 
+    # Define threshold (epsilon) – adjust based on problem
+    EPS = 1e-6  # if best fitness difference < EPS, consider converged
+
     for i, history in enumerate(all_histories):
-        plt.plot(history, alpha=0.6, label=f"Run {i+1}")
+        final_best = history[-1]
+        # Find first generation where fitness <= final_best + EPS
+        converged_idx = len(history)  # default to full length
+        for gen, val in enumerate(history):
+            if val <= final_best + EPS:
+                converged_idx = gen
+                break
+        # Truncate history up to converged_idx (inclusive)
+        truncated = history[:converged_idx+1]
+        plt.plot(truncated, alpha=0.6, label=f"Run {i+1}")
 
-
+    # For the average curve, keep full history (or truncate using same logic)
+    avg_curve = np.mean(all_histories, axis=0)
     plt.plot(avg_curve, linewidth=2, label="Average")
 
-    plt.xlabel("Generation")
-    plt.ylabel("Best Value (Min)")
-    plt.title("PSO Convergence (Sphere Function)")
+    plt.xlabel("GENERATION")
+    plt.ylabel("BEST VALUE (MIN)")
+    plt.title(f"CONVERGENCE GRAPH || PARTICLE SWARM OPTIMIZATION || SPHERE FUNCTION")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    os.makedirs("plots", exist_ok=True)
-    plt.savefig("plots/PSO_convergence.png", dpi=300)
+    # os.makedirs("plots", exist_ok=True)
+    # plt.savefig("plots/BCGA_convergence.png", dpi=300)
     plt.show()
 
     # Store results
     results.append({
         "histories": all_histories,
-        "best_Value_per_run": all_best_values,
+        "best_value_per_run": all_best_values,
         "best_solution_per_run": all_best_sol,
         "time_per_run": all_times,
     })
@@ -181,7 +194,7 @@ if __name__ == "__main__":
 
     for result in all_results:
 
-        best_values = np.array(result["best_Value_per_run"])
+        best_values = np.array(result["best_value_per_run"])
         times = np.array(result["time_per_run"])
 
         print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 100
-GENERATIONS = 200
+GENERATIONS = 100
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
@@ -128,7 +128,7 @@ def mutate(chromosome):
 # ===========================================================
 def real_coded_genetic_algorithm():
     # Initialize random population
-    population = generate_initial_population(POP_SIZE, DIMENSION)
+    population = generate_initial_population()
 
     # Evaluate fitness of the population
     fitness_values = np.array([
@@ -216,37 +216,50 @@ def solve_square_function():
         all_best_Values.append(best_value)
         all_times.append(run_time)
 
-        print(f"Run {run+1}: Best Value = {best_value:.6f}, Time = {run_time:.4f} sec")
+        print(f"Run {run+1}: Best Value = {best_value:}, Time = {run_time:.4f} sec")
 
     all_histories = np.array(all_histories)
     avg_curve = np.mean(all_histories, axis=0)
 
     # ==================================================
-    # PLOT
+    # PLOT WITH CONVERGENCE THRESHOLD
     # ==================================================
     plt.figure()
 
+    # Define threshold (epsilon) – adjust based on problem
+    EPS = 1e-6  # if best fitness difference < EPS, consider converged
+
     for i, history in enumerate(all_histories):
-        plt.plot(history, alpha=0.6, label=f"Run {i+1}")
+        final_best = history[-1]
+        # Find first generation where fitness <= final_best + EPS
+        converged_idx = len(history)  # default to full length
+        for gen, val in enumerate(history):
+            if val <= final_best + EPS:
+                converged_idx = gen
+                break
+        # Truncate history up to converged_idx (inclusive)
+        truncated = history[:converged_idx+1]
+        plt.plot(truncated, alpha=0.6, label=f"Run {i+1}")
 
-
+    # For the average curve, keep full history (or truncate using same logic)
+    avg_curve = np.mean(all_histories, axis=0)
     plt.plot(avg_curve, linewidth=2, label="Average")
 
-    plt.xlabel("Generation")
-    plt.ylabel("Best Value (Min)")
-    plt.title("RCGA Convergence (Sphere Function)")
+    plt.xlabel("GENERATION")
+    plt.ylabel("BEST VALUE (MIN)")
+    plt.title(f"CONVERGENCE GRAPH || REAL CODED GENETIC ALGORITHM || SPHERE FUNCTION")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    os.makedirs("plots", exist_ok=True)
-    plt.savefig("plots/RCGA_convergence.png", dpi=300)
+    # os.makedirs("plots", exist_ok=True)
+    # plt.savefig("plots/BCGA_convergence.png", dpi=300)
     plt.show()
 
     # Store results
     results.append({
         "histories": all_histories,
-        "best_Value_per_run": all_best_values,
+        "best_value_per_run": all_best_values,
         "best_solution_per_run": all_best_sol,
         "time_per_run": all_times,
     })
@@ -262,16 +275,16 @@ if __name__ == "__main__":
 
     for result in all_results:
 
-        best_values = np.array(result["best_Value_per_run"])
+        best_values = np.array(result["best_value_per_run"])
         times = np.array(result["time_per_run"])
 
         print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
 
         print(f"Number of runs        : {len(best_values)}")
-        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
-        print(f"Worst fitness         : {np.max(best_values):.6f}")
-        print(f"Average fitness       : {np.mean(best_values):.6f}")
-        print(f"Std deviation         : {np.std(best_values):.6f}")
+        print(f"Best fitness (min)    : {np.min(best_values):}")
+        print(f"Worst fitness         : {np.max(best_values):}")
+        print(f"Average fitness       : {np.mean(best_values):}")
+        print(f"Std deviation         : {np.std(best_values):}")
 
         print(f"\nAverage time/run      : {np.mean(times):.4f} sec")
         print(f"Total execution time  : {np.sum(times):.4f} sec")

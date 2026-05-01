@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-ITERATIONS = 200
+POP_SIZE = 100
+ITERATIONS = 250
 INTERTIA = 0.7
 C1 = 1.5
 C2 = 1.5
@@ -189,9 +189,6 @@ def particle_swarm_optimization(params):
                 p_best[i] =population[i].copy()
                 f_p_best[i] = fitness_values[i]
 
-        # Iteration best
-        # gen_best = np.min(f_p_best)
-        # best_fitness_per_gen.append(gen_best)
 
         # val, T =decode_chromosome(population[0],params)
         # print(f"Iteration {gen+1}:  Best Fitness = {gen_best_fitness}  Number of Validators = {len(val)}   Number of Transactions = {T}")
@@ -376,14 +373,14 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || PSO || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
+        plt.xlabel("GENERATION")
+        plt.ylabel("BEST UTILITY VALUE")
+        plt.title(f"CONVERGENCE GRAPH || PARTICLE SWARM OPTIMIZATION || BLOCKCHAIN CONFIGURATION OPTIMIZATION || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_PSO_convergence.png", dpi=300)
+        # os.makedirs("plots", exist_ok=True)
+        # plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_PSO_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -459,8 +456,8 @@ if __name__ == "__main__":
             # Print
             print(f"Number of Validators   : {len(number_of_validators)}")
             print(f"Number of Transactions : {T}")
-            print(f"Average utility        : {avg_utility:.2f} ± {std_utility:.2f}")
-            print(f"Best utility           : {best_utility:.2f}")
-            print(f"Worst utility          : {worst_utility:.2f}")
+            print(f"Average utility        : {avg_utility:} ± {std_utility:}")
+            print(f"Best utility           : {best_utility:}")
+            print(f"Worst utility          : {worst_utility:}")
             print(f"Average time           : {avg_time:.4f} s")
             print(f"Total time             : {total_time:.4f} s")

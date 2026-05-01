@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 100
-GENERATIONS = 300
+GENERATIONS = 200
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 DISTRIBUTIOIN_INDEX = 20
@@ -20,93 +20,124 @@ MUTATION_DISTRIBUTION_INDEX = 20
 # INITIAL POPULATION (REAL ENCODED)
 # ==========================================================
 def generate_initial_population(m,n):
-    # Generate random integers in [0, m)
+    # Generate random real numbers in [0, m)
     population = np.random.randint(0, m, size=(POP_SIZE, n))
    
     return np.array(population)
 
 
 # ==========================================================
-# REPAIR CHROMOSOME USING COST  APPROACH
+# REPAIR CHROMOSOME FOR MAXIMIZATION GAP
 # ==========================================================
 def repair_chromosome_greedy_cost(chromosome, C, R, B):
+    """
+    Repairs an infeasible chromosome for the MAXIMIZATION GAP problem.
+
+    Strategy:
+    - For each overloaded agent a, move jobs away to restore feasibility.
+    - Job selection priority: lowest profit-to-resource ratio at agent a
+      (cheapest jobs to keep → move them first to preserve high-value ones).
+    - Move destination: agent b that causes least profit loss (max gain).
+    - Repeats until fully feasible or no further progress is possible.
+    """
     n = len(C[0])   # number of jobs
     m = len(C)      # number of agents
 
+    C = np.array(C)     # ensure numpy for fast indexing
+    R = np.array(R)
+    B = np.array(B)
+
     agents = np.round(chromosome).astype(int)
+    agents = np.array(agents)
 
+    # Compute initial resource usage per agent
     resource_used = np.zeros(m)
+    for j in range(n):
+        resource_used[agents[j]] += R[agents[j], j]
 
-    # Compute initial resource usage
-    for j, agent in enumerate(agents):
-        resource_used[agent] += R[agent][j]
+    # Early exit if already feasible
+    if np.all(resource_used <= B):
+        return chromosome.copy()
 
-    # Repair overloaded agents
-    for a in range(m):
+    max_iterations = n * m      # safety cap
+    iteration = 0
+    changed = True
 
-        while resource_used[a] > B[a]:
+    while changed and iteration < max_iterations:
+        changed = False
+        iteration += 1
 
-            jobs = [j for j in range(n) if agents[j] == a]
+        for a in range(m):
 
-            if not jobs:
-                break
+            while resource_used[a] > B[a]:
 
-            best_move = None
-            best_gain = -float('inf')
+                # Jobs currently assigned to overloaded agent a
+                jobs_at_a = np.where(agents == a)[0]
 
-            # Try all jobs assigned to agent a
-            for j in jobs:
+                if len(jobs_at_a) == 0:
+                    break
 
-                current_profit = C[a][j]
+                # Priority: move cheapest jobs first
+                # Sort by profit-to-resource ratio ascending
+                # (lowest ratio = least valuable per unit resource = move first)
+                ratios = np.array([
+                    C[a, j] / R[a, j] if R[a, j] > 0 else float('inf')
+                    for j in jobs_at_a
+                ])
+                priority_order = jobs_at_a[np.argsort(ratios)]
 
-                # Try assigning job j to other agents
-                for b in range(m):
+                best_move = None
+                best_gain = -float('inf')   # maximize: least profit loss
 
-                    if b == a:
-                        continue
+                for j in priority_order:
+                    for b in range(m):
+                        if b == a:
+                            continue
 
-                    # Check feasibility
-                    if resource_used[b] + R[b][j] <= B[b]:
+                        # Check if move is feasible for agent b
+                        if resource_used[b] + R[b, j] <= B[b]:
 
-                        new_profit = C[b][j]
-                        gain = new_profit - current_profit
-                        # gain = new_profit / R[a][j] - current_profit / R[b][j]
+                            # Maximization: prefer move with highest gain
+                            # (or least loss if all negative)
+                            gain = C[b, j] - C[a, j]
 
-                        if gain > best_gain:
-                            best_gain = gain
-                            best_move = (j, b)
+                            if gain > best_gain:
+                                best_gain = gain
+                                best_move = (j, b)
 
-            # Apply best move
-            if best_move is not None:
-                j, new_agent = best_move
-                old_agent = agents[j]
+                    # Early exit: found a profitable move, no need to
+                    # check remaining jobs in priority order
+                    if best_move is not None and best_gain >= 0:
+                        break
 
-                resource_used[old_agent] -= R[old_agent][j]
-                resource_used[new_agent] += R[new_agent][j]
+                if best_move is not None:
+                    j, new_agent = best_move
 
-                agents[j] = new_agent
-            else:
-                # No feasible improvement possible
-                break
+                    # Apply move
+                    resource_used[a]         -= R[a, j]
+                    resource_used[new_agent] += R[new_agent, j]
+                    agents[j]                 = new_agent
+
+                    changed = True
+
+                else:
+                    # No feasible move exists for agent a
+                    # (chromosome is irreparable for this agent)
+                    break
 
     return agents
 
 
 # ==========================================================
-# FITNESS FUNCTION (Maximization with Penalty)
+# FITNESS FUNCTION
 # ==========================================================
-def fitness(chromosome, C, R, B):
+def fitness(chromosome, C):
     cost = 0
-
-    m = len(C)      # number of Agents
-
-    resource_used = [0] * m
 
     chromosome = np.round(chromosome).astype(int)
 
     for j, agent in enumerate(chromosome):
         cost += C[agent][j]
-        resource_used[agent] += R[agent][j]
 
     return cost
 
@@ -134,25 +165,36 @@ def is_feasible(chromosome, R, B):
 
 
 # ==========================================================
-# SELECT A PARENT 
+# BINARY TOURNAMNET SELECTION 
 # ==========================================================
-def tournament_selection(population, fitness_values, k=3, minimize=False):
-    pop_size = len(population)                     # use current size
-    k = min(k, pop_size)                           # ensure k ≤ pop_size
-    if pop_size == 0:
-        raise ValueError("Population is empty – cannot select parents.")
-    competitors = np.random.choice(pop_size, k, replace=False)
+def binary_tournament_selection(population, fitness_values, k=2, problem="max"):
+    fitness_values = np.array(fitness_values)  
+    Np = len(population)
+    
+    if Np == 0:
+        raise ValueError("Population is empty.")
+    
+    mating_pool = []
+    selection_count = np.zeros(Np, dtype=int)
 
-    best_index = competitors[0]
-    for idx in competitors[1:]:
-        if minimize:
-            if fitness_values[idx] < fitness_values[best_index]:
-                best_index = idx
+    while len(mating_pool) < Np:
+        available = np.where(selection_count < 2)[0]
+
+        # If not enough available, fall back to full population
+        if len(available) < k:
+            available = np.arange(Np)
+
+        participants = np.random.choice(available, k, replace=False)
+
+        if problem == "min":
+            winner = participants[np.argmin(fitness_values[participants])]
         else:
-            if fitness_values[idx] > fitness_values[best_index]:
-                best_index = idx
+            winner = participants[np.argmax(fitness_values[participants])]
 
-    return population[best_index]
+        mating_pool.append(population[winner].copy())
+        selection_count[winner] += 1
+
+    return np.array(mating_pool)
 
 
 # ==========================================================
@@ -187,6 +229,7 @@ def crossover(p1, p2, m):
 
     return np.array(child1), np.array(child2)
 
+
 # ==========================================================
 # POLYNOMIAL MUTATION
 # ==========================================================
@@ -205,7 +248,7 @@ def mutate(chromosome,m):
                 delta = 1 - (2 * (1 - r)) ** (1.0 / (MUTATION_DISTRIBUTION_INDEX + 1))
 
             # Apply mutation
-            chromosome[i] = chromosome[i] + delta * (m - 0)
+            chromosome[i] = chromosome[i] + delta * (m -1 - 0)
 
 
     # Keep within bounds
@@ -223,62 +266,70 @@ def real_coded_genetic_algorithm(C, R, B):
     # Generate Initial Population
     population = generate_initial_population(m,n)
     
-     # Store best chromosome
-    best_solution = None
-    # Store best chromosome's fitness value
-    best_fitness = float('-inf')
-    # Best Fitness per generation
-    best_fitness_per_gen = []
-
     # Evaluate fitness values
-    fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
+    fitness_values = [fitness(chromosome, C) for chromosome in population]
 
-    for _ in range(GENERATIONS):
+    # Store best chromosome
+    best_idx = np.argmax(fitness_values)
+    best_solution  = population[best_idx]
+    best_fitness = fitness_values[best_idx]
+
+    # Best Fitness so far per gen
+    best_fitness_so_far_per_gen = []
+
+    for gen in range(GENERATIONS):
+        mating_pool = binary_tournament_selection(population,fitness_values)
         offspring_population = []
-        
+
         # CROSSOVER
         for i in range(POP_SIZE // 2):
-            p1 = tournament_selection(population, fitness_values)
-            p2 = tournament_selection(population, fitness_values)
-
+            p1, p2 = mating_pool[np.random.choice(len(mating_pool), 2, replace=False)]
             c1, c2 = crossover(p1, p2, m)
 
             # offsprings are added
             offspring_population.append(c1)
             offspring_population.append(c2)
+        
 
         # MUTATION
         for i in range(len(offspring_population)):
-            offspring_population[i] = mutate(offspring_population[i],m)
-            offspring_population[i] = repair_chromosome_greedy_cost(offspring_population[i],C,R,B)
+            offspring_population[i] = mutate(offspring_population[i], m)
+
+        # Repair infeasible solution
+        offspring_population = [
+            repair_chromosome_greedy_cost(c, C, R, B)
+            if not is_feasible(c, R, B)
+            else c
+            for c in offspring_population
+        ]
 
         # Evaluate offspring fitness 
-        offspring_fitness = [fitness(ind, C, R, B) for ind in offspring_population]
+        offspring_fitness = [fitness(ind, C) for ind in offspring_population]
 
-        # Combine
-        combined_population = list(population) + offspring_population
-        combined_fitness = list(fitness_values) + offspring_fitness
+        # Combine + elitist selection
+        combined = list(zip(
+            list(population) + offspring_population,
+            list(fitness_values) + offspring_fitness
+        ))
+        combined.sort(key=lambda x: x[1], reverse=True)
+        combined = combined[:POP_SIZE]
 
-        # Sort
-        sorted_indices = np.argsort(combined_fitness)[::-1]
+        # Paired
+        population, fitness_values = zip(*combined)
+        population = list(population)
+        fitness_values = list(fitness_values)
 
-        # Select next generation
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
+        # Update best
+        gen_best = fitness_values[0]
+        if gen_best > best_fitness:
+            best_fitness = gen_best
+            best_solution = population[0].copy()
 
-        # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
-        best_fitness_per_gen.append(gen_best_fitness)
+        best_fitness_so_far_per_gen.append(best_fitness)
 
-        # Update global best
-        if gen_best_fitness > best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = population[0]
+        # print(f"Generation {gen+1}: Best Fitness So Far = {best_fitness}")
 
-        # print(f"Generation {gen+1}: Best Fitness = {gen_best_fitness}")
-
-    return best_solution, best_fitness, best_fitness_per_gen
-
+    return best_solution, best_fitness, best_fitness_so_far_per_gen
 
 
 # ================================================================
@@ -377,14 +428,14 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation / Iteration")
-        plt.ylabel("Best Cost")
-        plt.title(f"CONVERGENCE GRAPH || REAL CODED GENETIC ALGORITHM || REPAIR BASED || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.xlabel("GENERATION")
+        plt.ylabel("BEST COST")
+        plt.title(f"CONVERGENCE GRAPH || REAL CODED GENETIC ALGORITHM || REPAIR BASED (GREEDY) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_RCGA_repair_cost_convergence.png", dpi=300)
+        # os.makedirs("plots", exist_ok=True)
+        # plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_RCGA_repair_cost_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -434,11 +485,11 @@ files = [
     # "gap5.txt",
     # "gap6.txt",
     # "gap7.txt",
-    # "gap8.txt",
+    "gap8.txt",
     # "gap9.txt",
-    # "gap10.txt",
+    "gap10.txt",
     # "gap11.txt",
-    "gap12.txt"
+    # "gap12.txt"
 ]
 
 

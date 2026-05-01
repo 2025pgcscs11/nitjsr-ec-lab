@@ -54,9 +54,9 @@ def plot_grouped_gap_histogram(x, y, z):
     group_centers = indices + (n_algos * bar_width) / 2
     plt.xticks(group_centers, ["GAP 12", "GAP 8", "GAP 10"])
 
-    plt.xlabel("Dataset (First instance of GAP-8, GAP-10, GAP-12 File)")
-    plt.ylabel("Average Best Cost")
-    plt.title("Algorithm Performance Comparison on GAP")
+    plt.xlabel("DATASET (First instance of GAP-8, GAP-10, GAP-12 File)")
+    plt.ylabel("AVERAGE BEST COST")
+    plt.title("ALGORITHM PERFORMANCE COMPARISION ON GAP")
 
     plt.legend(loc='upper right', framealpha=0.9)
     plt.grid(axis='y', alpha=0.3)
@@ -69,7 +69,7 @@ def plot_grouped_gap_histogram(x, y, z):
 if __name__ == "__main__": 
     # ["BCGA", "RCGA", "PSO", "DE", "TLBO", "ABC"]
     gap12 = [1428.56, 1422.57, 1440.25, 1423.00, 1436.43, 1423.55]
-    gap10 = [948.07, 943.00, 954.40, 936.00, 948.38, 926.15]
+    gap10 = [945.85, 942.36, 953.30, 954.00, 940.00, 933.95]
     gap8  = [959.00, 1070.00, 1085.00, 1006, 1050, 1065.65]
     
     plot_grouped_gap_histogram(gap12, gap8, gap10)

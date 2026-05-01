@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-GENERATIONS = 200
+POP_SIZE = 100
+GENERATIONS = 300
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 
@@ -53,8 +53,6 @@ def decode_chromosome(chromosome, params):
     for bit in T_bits:
         T = (T << 1) | bit
 
-    # T = t_min + ((t_max - t_min) / ((2 ** num_bits_T) -1)) * T
-    # T = np.clip(T, t_min, t_max)
     max_val = (2 ** len(T_bits)) - 1
     T = t_min + int((T / max_val) * (t_max - t_min))
 
@@ -154,7 +152,6 @@ def binary_tournament_selection(population, fitness_values, k=2, problem="min"):
     return np.array(mating_pool)
 
 
-
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM BIT POINTS)
 # ==========================================================
@@ -195,8 +192,7 @@ def binary_coded_genetic_algorithm(params):
     best_fitness = fitness_values[best_idx]
     
     # Best Fitness per generation
-    best_fitness_per_gen = []
-
+    best_fitness_so_far_per_gen = []
 
     for gen in range(GENERATIONS):
         mating_pool = binary_tournament_selection(population,fitness_values)
@@ -220,30 +216,31 @@ def binary_coded_genetic_algorithm(params):
         # Evaluate offspring fitness 
         offspring_fitness = [fitness(ind, params) for ind in offspring_population]
 
-        # Combine
-        combined_population = list(population) + offspring_population
-        combined_fitness = list(fitness_values) + offspring_fitness
+        # Combine + elitist selection
+        combined = list(zip(
+            list(population) + offspring_population,
+            list(fitness_values) + offspring_fitness
+        ))
+        combined.sort(key=lambda x: x[1], reverse=False)
+        combined = combined[:POP_SIZE]
 
-        # Sort
-        sorted_indices = np.argsort(combined_fitness)
+        # Paired
+        population, fitness_values = zip(*combined)
+        population = list(population)
+        fitness_values = list(fitness_values)
 
-        # Select next generation
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
+        # Update best
+        gen_best = fitness_values[0]
+        if gen_best < best_fitness:
+            best_fitness = gen_best
+            best_solution = population[0].copy()
 
-        # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
-        best_fitness_per_gen.append(gen_best_fitness)
-
-        # Update global best
-        if gen_best_fitness < best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = population[0]
+        best_fitness_so_far_per_gen.append(best_fitness)
 
         # val, T =decode_chromosome(population[0],params)
         # print(f"Generation {gen+1}:  Best Fitness = {gen_best_fitness}    Number of Validators = {len(val)}   Number of Transactions = {T}")
 
-    return best_solution, best_fitness, best_fitness_per_gen
+    return best_solution, best_fitness, best_fitness_so_far_per_gen
 
 
 # ==========================================================
@@ -414,14 +411,14 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || BCGA || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
+        plt.xlabel("GENERATION")
+        plt.ylabel("BEST UTILITY VALUE")
+        plt.title(f"CONVERGENCE GRAPH || BINARY CODED GENETIC ALGORITHM || BLOCKCHAIN CONFIGURATION OPTIMIZATION || {os.path.splitext(os.path.basename(filename))[0]} || Setting {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_convergence.png", dpi=300)
+        # os.makedirs("plots", exist_ok=True)
+        # plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_setting_{idx}_BCGA_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -497,8 +494,8 @@ if __name__ == "__main__":
             # Print
             print(f"Number of Validators   : {len(number_of_validators)}")
             print(f"Number of Transactions : {T}")
-            print(f"Average utility        : {avg_utility:.2f} ± {std_utility:.2f}")
-            print(f"Best utility           : {best_utility:.2f}")
-            print(f"Worst utility          : {worst_utility:.2f}")
+            print(f"Average utility        : {avg_utility:} ± {std_utility:}")
+            print(f"Best utility           : {best_utility:}")
+            print(f"Worst utility          : {worst_utility:}")
             print(f"Average time           : {avg_time:.4f} s")
             print(f"Total time             : {total_time:.4f} s")

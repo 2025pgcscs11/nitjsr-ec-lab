@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 100
-GENERATIONS = 200
+GENERATIONS = 100
 DIMENSION = 10
 LOWER_BOUND = 0
 UPPER_BOUND = 30
@@ -92,34 +92,6 @@ def binary_tournament_selection(population, fitness_values, k=2, problem="min"):
         selection_count[winner] += 1
     
     return np.array(mating_pool)
-
-# def k_tournament_selection(population, fitness_values, k=2, problem="min"):
-#     Np = len(population)
-#     mating_pool = []
-
-#     selection_count = np.zeros(Np, dtype=int)
-
-#     for _ in range(Np):
-#         # pick k participants who have been selected < k times
-#         participants = []
-
-#         while len(participants) < k:
-#             idx = np.random.randint(0, Np)
-#             if selection_count[idx] < k and idx not in participants:
-#                 participants.append(idx)
-#                 selection_count[idx] += 1
-
-#         participants = np.array(participants)
-
-#         # choose winner
-#         if problem == "min":
-#             winner = participants[np.argmin(fitness_values[participants])]
-#         else:
-#             winner = participants[np.argmax(fitness_values[participants])]
-
-#         mating_pool.append(population[winner])
-
-#     return np.array(mating_pool)
 
 
 # ==========================================================
@@ -212,7 +184,6 @@ def binary_coded_genetic_algorithm():
     return best_solution, best_fitness, best_fitness_per_gen
 
 
-
 # ==========================================================
 # MULTIPLE RUNS
 # ==========================================================
@@ -240,37 +211,50 @@ def solve_square_function():
         all_best_values.append(best_value)
         all_times.append(run_time)
 
-        print(f"Run {run+1}: Best value = {best_value:.6f}, Time = {run_time:.4f} sec")
+        print(f"Run {run+1}: Best value = {best_value:}, Time = {run_time:.4f} sec")
 
     all_histories = np.array(all_histories)
     avg_curve = np.mean(all_histories, axis=0)
 
     # ==================================================
-    # PLOT
+    # PLOT WITH CONVERGENCE THRESHOLD
     # ==================================================
     plt.figure()
 
+    # Define threshold (epsilon) – adjust based on problem
+    EPS = 1e-6  # if best fitness difference < EPS, consider converged
+
     for i, history in enumerate(all_histories):
-        plt.plot(history, alpha=0.6, label=f"Run {i+1}")
+        final_best = history[-1]
+        # Find first generation where fitness <= final_best + EPS
+        converged_idx = len(history)  # default to full length
+        for gen, val in enumerate(history):
+            if val <= final_best + EPS:
+                converged_idx = gen
+                break
+        # Truncate history up to converged_idx (inclusive)
+        truncated = history[:converged_idx+1]
+        plt.plot(truncated, alpha=0.6, label=f"Run {i+1}")
 
-
+    # For the average curve, keep full history (or truncate using same logic)
+    avg_curve = np.mean(all_histories, axis=0)
     plt.plot(avg_curve, linewidth=2, label="Average")
 
-    plt.xlabel("Generation")
-    plt.ylabel("Best value (Min)")
-    plt.title("BCGA Convergence (Sphere Function)")
+    plt.xlabel("GENERATION")
+    plt.ylabel("BEST VALUE (MIN)")
+    plt.title(f"CONVERGENCE GRAPH || BINARY CODED GENETIC ALGORITHM || SPHERE FUNCTION")
     plt.legend(loc='best')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    os.makedirs("plots", exist_ok=True)
-    plt.savefig("plots/BCGA_convergence.png", dpi=300)
+    # os.makedirs("plots", exist_ok=True)
+    # plt.savefig("plots/BCGA_convergence.png", dpi=300)
     plt.show()
 
     # Store results
     results.append({
         "histories": all_histories,
-        "best_cost_per_run": all_best_values,
+        "best_value_per_run": all_best_values,
         "best_solution_per_run": all_best_sol,
         "time_per_run": all_times,
     })
@@ -287,16 +271,16 @@ if __name__ == "__main__":
 
     for result in all_results:
 
-        best_values = np.array(result["best_cost_per_run"])
+        best_values = np.array(result["best_value_per_run"])
         times = np.array(result["time_per_run"])
 
         print("\n===== FINAL SUMMARY (SPHERE FUNCTION) =====")
 
         print(f"Number of runs        : {len(best_values)}")
-        print(f"Best fitness (min)    : {np.min(best_values):.6f}")
-        print(f"Worst fitness         : {np.max(best_values):.6f}")
-        print(f"Average fitness       : {np.mean(best_values):.6f}")
-        print(f"Std deviation         : {np.std(best_values):.6f}")
+        print(f"Best fitness (min)    : {np.min(best_values):}")
+        print(f"Worst fitness         : {np.max(best_values):}")
+        print(f"Average fitness       : {np.mean(best_values):}")
+        print(f"Std deviation         : {np.std(best_values):}")
 
         print(f"\nAverage time/run      : {np.mean(times):.4f} sec")
         print(f"Total execution time  : {np.sum(times):.4f} sec")

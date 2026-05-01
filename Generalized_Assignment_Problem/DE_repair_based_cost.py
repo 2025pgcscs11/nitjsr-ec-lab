@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # CONSTANT PARAMETERS
 # ==========================================================
 POP_SIZE = 100
-ITERATIONS = 300
+ITERATIONS = 200
 SCALING_FACTOR = 0.85
 CROSSOVER_RATE = 0.8
 
@@ -28,64 +28,100 @@ def generate_initial_population(pop_size, m, n):
 # REPAIR TRIAL USING COST  APPROACH
 # ==========================================================
 def repair_trial_greedy_cost(trial, C, R, B):
+    """
+    Repairs an infeasible trial for the MAXIMIZATION GAP problem.
+
+    Strategy:
+    - For each overloaded agent a, move jobs away to restore feasibility.
+    - Job selection priority: lowest profit-to-resource ratio at agent a
+      (cheapest jobs to keep → move them first to preserve high-value ones).
+    - Move destination: agent b that causes least profit loss (max gain).
+    - Repeats until fully feasible or no further progress is possible.
+    """
     n = len(C[0])   # number of jobs
     m = len(C)      # number of agents
 
-    agents = trial.astype(int)
+    C = np.array(C)     # ensure numpy for fast indexing
+    R = np.array(R)
+    B = np.array(B)
 
+    agents = np.round(trial).astype(int)
+    agents = np.array(agents)
+
+    # Compute initial resource usage per agent
     resource_used = np.zeros(m)
+    for j in range(n):
+        resource_used[agents[j]] += R[agents[j], j]
 
-    # Compute initial resource usage
-    for j, agent in enumerate(agents):
-        resource_used[agent] += R[agent][j]
+    # Early exit if already feasible
+    if np.all(resource_used <= B):
+        return trial.copy()
 
-    # Repair overloaded agents
-    for a in range(m):
+    max_iterations = n * m      # safety cap
+    iteration = 0
+    changed = True
 
-        while resource_used[a] > B[a]:
+    while changed and iteration < max_iterations:
+        changed = False
+        iteration += 1
 
-            jobs = [j for j in range(n) if agents[j] == a]
+        for a in range(m):
 
-            if not jobs:
-                break
+            while resource_used[a] > B[a]:
 
-            best_move = None
-            best_gain = -float('inf')
+                # Jobs currently assigned to overloaded agent a
+                jobs_at_a = np.where(agents == a)[0]
 
-            # Try all jobs assigned to agent a
-            for j in jobs:
+                if len(jobs_at_a) == 0:
+                    break
 
-                current_profit = C[a][j]
+                # Priority: move cheapest jobs first
+                # Sort by profit-to-resource ratio ascending
+                # (lowest ratio = least valuable per unit resource = move first)
+                ratios = np.array([
+                    C[a, j] / R[a, j] if R[a, j] > 0 else float('inf')
+                    for j in jobs_at_a
+                ])
+                priority_order = jobs_at_a[np.argsort(ratios)]
 
-                # Try assigning job j to other agents
-                for b in range(m):
+                best_move = None
+                best_gain = -float('inf')   # maximize: least profit loss
 
-                    if b == a:
-                        continue
+                for j in priority_order:
+                    for b in range(m):
+                        if b == a:
+                            continue
 
-                    # Check feasibility
-                    if resource_used[b] + R[b][j] <= B[b]:
+                        # Check if move is feasible for agent b
+                        if resource_used[b] + R[b, j] <= B[b]:
 
-                        new_profit = C[b][j]
-                        gain = new_profit - current_profit
-                        # gain = new_profit / R[a][j] - current_profit / R[b][j]
+                            # Maximization: prefer move with highest gain
+                            # (or least loss if all negative)
+                            gain = C[b, j] - C[a, j]
 
-                        if gain > best_gain:
-                            best_gain = gain
-                            best_move = (j, b)
+                            if gain > best_gain:
+                                best_gain = gain
+                                best_move = (j, b)
 
-            # Apply best move
-            if best_move is not None:
-                j, new_agent = best_move
-                old_agent = agents[j]
+                    # Early exit: found a profitable move, no need to
+                    # check remaining jobs in priority order
+                    if best_move is not None and best_gain >= 0:
+                        break
 
-                resource_used[old_agent] -= R[old_agent][j]
-                resource_used[new_agent] += R[new_agent][j]
+                if best_move is not None:
+                    j, new_agent = best_move
 
-                agents[j] = new_agent
-            else:
-                # No feasible improvement possible
-                break
+                    # Apply move
+                    resource_used[a]         -= R[a, j]
+                    resource_used[new_agent] += R[new_agent, j]
+                    agents[j]                 = new_agent
+
+                    changed = True
+
+                else:
+                    # No feasible move exists for agent a
+                    # (trial is irreparable for this agent)
+                    break
 
     return agents
 
@@ -94,18 +130,13 @@ def repair_trial_greedy_cost(trial, C, R, B):
 # ==========================================================
 # FITNESS FUNCTION (Maximization with Penalty)
 # ==========================================================
-def fitness(vector, C, R, B):
+def fitness(vector, C):
     cost = 0
-
-    m = len(B)
-    resource_used = [0] * m
     
     agents = vector.astype(int)
 
     for j, agent in enumerate(agents):
         cost += C[agent][j]
-        resource_used[agent] += R[agent][j]
-
 
     return cost
 
@@ -146,7 +177,7 @@ def differential_evolution_based_optimization(C, R, B):
 
     # Evaluate fitness of the target vector
     fitness_values = np.array([
-        fitness(target_vector[i], C, R, B)
+        fitness(target_vector[i], C)
         for i in range(POP_SIZE)
     ])
 
@@ -189,7 +220,7 @@ def differential_evolution_based_optimization(C, R, B):
                 trial_vector[i] = repair_trial_greedy_cost(trial_vector[i],C,R,B)
 
             # Selection
-            temp = fitness(trial_vector[i], C, R, B)
+            temp = fitness(trial_vector[i], C)
             if temp > fitness_values[i]:
                 target_vector[i] = trial_vector[i]
                 fitness_values[i] = temp 
@@ -306,14 +337,14 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation / Iteration")
-        plt.ylabel("Best Cost")
-        plt.title(f"CONVERGENCE GRAPH || DIFFERENTIAL EVOLUTION ALGORITHM || REPAIR BASED || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.xlabel("ITERATION")
+        plt.ylabel("BEST COST")
+        plt.title(f"CONVERGENCE GRAPH || DIFFERENTIAL EVOLUTION ALGORITHM || REPAIR BASED (GREEDY) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_DE_repair_cost_convergence.png", dpi=300)
+        # os.makedirs("plots", exist_ok=True)
+        # plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_DE_repair_cost_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -365,11 +396,11 @@ files = [
     # "gap5.txt",
     # "gap6.txt",
     # "gap7.txt",
-    # "gap8.txt",
+    "gap8.txt",
     # "gap9.txt",
-    # "gap10.txt",
+    "gap10.txt",
     # "gap11.txt",
-    "gap12.txt",
+    # "gap12.txt",
 ]
 
 

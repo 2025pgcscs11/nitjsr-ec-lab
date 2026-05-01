@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
+POP_SIZE = 200
 GENERATIONS = 100
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
@@ -19,7 +19,7 @@ MUTATION_RATE = 0.1
 # ==========================================================
 def generate_initial_population(m, n):
     # Number of bits needed to represent values up to m-1
-    num_bits = int(np.ceil(np.log2(m)))
+    num_bits = int(np.ceil(np.log2(m))) if m > 1 else 1
 
     # Generate random integers in [0, 1]
     population = np.random.randint(0, 2, size=(POP_SIZE, num_bits * n))
@@ -31,7 +31,7 @@ def generate_initial_population(m, n):
 # DECODE CHROMOSOME AND EXTRACT AGENTS
 # ==========================================================
 def decode_chromosome(chromosome, m):
-    num_bits = int(np.ceil(np.log2(m)))
+    num_bits = int(np.ceil(np.log2(m))) if m > 1 else 1
     agents = []
 
     for j in range(len(chromosome) // num_bits):
@@ -43,8 +43,9 @@ def decode_chromosome(chromosome, m):
             value = (value << 1) | bit
 
         # Keep within bounds
-        value = value % m
-        # value = min(value, m - 1)
+        if value >= m:
+            value = np.random.randint(0, m)
+
         agents.append(value)
 
     return agents
@@ -54,67 +55,114 @@ def decode_chromosome(chromosome, m):
 # ENCODE CHROMOSOME INTO BINARY
 # ==========================================================
 def encode_chromosome(assignment, m):
-    num_bits = int(np.ceil(np.log2(m)))
+    """
+    Converts a list of agent assignments into a binary chromosome.
+    Each agent index is encoded MSB-first to match decode_chromosome.
+    """
+    num_bits = int(np.ceil(np.log2(m))) if m > 1 else 1
     chromosome = []
 
     for agent in assignment:
         for i in reversed(range(num_bits)):
             chromosome.append((agent >> i) & 1)
 
-    return chromosome
+    return np.array(chromosome, dtype=np.int8)
 
 
 # ==========================================================
-# REPAIR CHROMOSOME USING RANDOM APPROACH
+# REPAIR CHROMOSOME USING RANDOM APPROACH (MAXIMIZATION GAP)
 # ==========================================================
-def repair_chromosome_random(chromosome,C,R,B):
-    n = len(C[0])   # number of Jobs
-    m = len(C)      # number of Agents
+def repair_chromosome_random(chromosome, C, R, B):
+    """
+    Repairs an infeasible chromosome for the MAXIMIZATION GAP problem.
 
-    agents = decode_chromosome(chromosome,m)
+    Strategy:
+    - For each overloaded agent a, pick jobs in descending resource order
+      (to fix overload in fewest moves possible).
+    - Among feasible destination agents, pick ONE at RANDOM
+      (preserves diversity unlike greedy which always picks the same move).
+    - Repeats outer loop to handle cascade overloads from prior moves.
+    - Exits early if already feasible.
+    """
+    C = np.array(C)
+    R = np.array(R)
+    B = np.array(B)
 
+    n = len(C[0])
+    m = len(C)
+
+    agents = np.array(decode_chromosome(chromosome, m))
+
+    # Compute initial resource usage
     resource_used = np.zeros(m)
+    for j in range(n):
+        resource_used[agents[j]] += R[agents[j], j]
 
-    for j, agent in enumerate(agents):
-        resource_used[agent] += R[agent][j]
+    # ✅ Early exit if already feasible
+    if np.all(resource_used <= B):
+        return chromosome.copy()
 
-    for a in range(m):
+    max_iterations = n * m      # ✅ safety cap
+    iteration = 0
+    changed = True
 
-        while resource_used[a] > B[a]:
+    # ✅ Outer loop handles cascade overloads
+    while changed and iteration < max_iterations:
+        changed = False
+        iteration += 1
 
-            jobs = [j for j in range(n) if agents[j] == a]
+        for a in range(m):
 
-            if not jobs:
-                break
+            while resource_used[a] > B[a]:
 
-            j = np.random.choice(jobs)
+                # Jobs currently at overloaded agent a
+                jobs_at_a = np.where(agents == a)[0]
 
-            feasible_agents = []
+                if len(jobs_at_a) == 0:
+                    break
 
-            for b in range(m):
+                # ✅ Sort by resource descending — fix overload in fewest moves
+                # Randomness is reserved for DESTINATION selection
+                resource_order = jobs_at_a[
+                    np.argsort(R[a, jobs_at_a])[::-1]
+                ]
 
-                if b != a and resource_used[b] + R[b][j] <= B[b]:
-                    feasible_agents.append(b)
+                moved = False
 
-            if feasible_agents:
+                for j in resource_order:
 
-                new_agent = np.random.choice(feasible_agents)
+                    # ✅ All agents that can absorb job j
+                    feasible_agents = np.array([
+                        b for b in range(m)
+                        if b != a and resource_used[b] + R[b, j] <= B[b]
+                    ])
 
-                resource_used[a] -= R[a][j]
-                resource_used[new_agent] += R[new_agent][j]
+                    if len(feasible_agents) == 0:
+                        continue    # try next job, not break
 
-                agents[j] = new_agent
+                    # ✅ RANDOM choice among all feasible destinations
+                    new_agent = np.random.choice(feasible_agents)
 
-            else:
-                break
+                    # Apply move
+                    resource_used[a]         -= R[a, j]
+                    resource_used[new_agent] += R[new_agent, j]
+                    agents[j]                 = new_agent
 
-    return encode_chromosome(agents,m)
+                    changed = True
+                    moved = True
+                    break       # one move per while iteration, re-check overload
+
+                if not moved:
+                    # No job from agent a can be feasibly moved anywhere
+                    break
+
+    return encode_chromosome(agents.tolist(), m)
 
 
 # ==========================================================
-# FITNESS FUNCTION (Maximization with Penalty)
+# FITNESS FUNCTION
 # ==========================================================
-def fitness(chromosome, C, R, B):
+def fitness(chromosome, C, R):
     cost = 0
 
     m = len(C)      # number of Agents
@@ -154,25 +202,36 @@ def is_feasible(chromosome, R, B):
 
 
 # ==========================================================
-# SELECT A PARENT 
+# BINARY TOURNAMNET SELECTION 
 # ==========================================================
-def tournament_selection(population, fitness_values, k=3, minimize=False):
-    pop_size = len(population)                     # use current size
-    k = min(k, pop_size)                            # ensure k ≤ pop_size
-    if pop_size == 0:
-        raise ValueError("Population is empty – cannot select parents.")
-    competitors = np.random.choice(pop_size, k, replace=False)
+def binary_tournament_selection(population, fitness_values, k=2, problem="max"):
+    fitness_values = np.array(fitness_values)  
+    Np = len(population)
+    
+    if Np == 0:
+        raise ValueError("Population is empty.")
+    
+    mating_pool = []
+    selection_count = np.zeros(Np, dtype=int)
 
-    best_index = competitors[0]
-    for idx in competitors[1:]:
-        if minimize:
-            if fitness_values[idx] < fitness_values[best_index]:
-                best_index = idx
+    while len(mating_pool) < Np:
+        available = np.where(selection_count < 2)[0]
+
+        # If not enough available, fall back to full population
+        if len(available) < k:
+            available = np.arange(Np)
+
+        participants = np.random.choice(available, k, replace=False)
+
+        if problem == "min":
+            winner = participants[np.argmin(fitness_values[participants])]
         else:
-            if fitness_values[idx] > fitness_values[best_index]:
-                best_index = idx
+            winner = participants[np.argmax(fitness_values[participants])]
 
-    return population[best_index].copy()
+        mating_pool.append(population[winner].copy())
+        selection_count[winner] += 1
+
+    return np.array(mating_pool)
 
 
 # ==========================================================
@@ -180,18 +239,20 @@ def tournament_selection(population, fitness_values, k=3, minimize=False):
 # ==========================================================
 def crossover(p1, p2):
     if np.random.rand() < CROSSOVER_RATE:
-        point = np.random.randint(1, len(p1) - 2)
+        point = np.random.randint(1, len(p1) - 1)
         return (
         np.concatenate((p1[:point], p2[point:])),
         np.concatenate((p2[:point], p1[point:]))
         )
     return p1.copy(), p2.copy()
 
+
 # ==========================================================
 # CROSSOVER ON TWO PARENTS (RANDOM GENE POINTS)
 # ==========================================================
 # def crossover(p1, p2, m):
-#     num_bits = int(np.ceil(np.log2(m)))
+#     num_bits = int(np.ceil(np.log2(m))) if m > 1 else 1
+
 #     if random.random() < CROSSOVER_RATE:
 #         num_genes = len(p1) // num_bits
 #         point = random.randint(1, num_genes - 1)
@@ -213,11 +274,13 @@ def mutate(chromosome):
             chromosome[i] ^= 1
     return chromosome
 
+
 # ==========================================================
 # MUTATION IN A CHROMOSOME (GENE-WISE)
 # ==========================================================
 # def mutate(chromosome, m):
-#     num_bits = int(np.ceil(np.log2(m)))
+#      num_bits = int(np.ceil(np.log2(m))) if m > 1 else 1
+
 #     # Decode chromosome into agent list
 #     agents = decode_chromosome(chromosome, num_bits)
 
@@ -244,24 +307,24 @@ def binary_coded_genetic_algorithm(C, R, B):
     # Generate Initial Population
     population = generate_initial_population(m,n)
 
-    # Store best chromosome
-    best_solution = None
-    # Store best chromosome's fitness value
-    best_fitness = float('-inf')
-    # Best Fitness per generation
-    best_fitness_per_gen = []
-
     # Evaluate fitness values
-    fitness_values = [fitness(chromosome, C, R, B) for chromosome in population]
+    fitness_values = [fitness(chromosome, C, R) for chromosome in population]
+
+    # Store best chromosome
+    best_idx = np.argmax(fitness_values)
+    best_solution  = population[best_idx]
+    best_fitness = fitness_values[best_idx]
+
+    # Best Fitness so far per gen
+    best_fitness_so_far_per_gen = []
 
     for gen in range(GENERATIONS):
+        mating_pool = binary_tournament_selection(population,fitness_values)
         offspring_population = []
 
         # CROSSOVER
         for i in range(POP_SIZE // 2):
-            p1 = tournament_selection(population, fitness_values)
-            p2 = tournament_selection(population, fitness_values)
-
+            p1, p2 = mating_pool[np.random.choice(len(mating_pool), 2, replace=False)]
             c1, c2 = crossover(p1, p2)
 
             # offsprings are added
@@ -271,41 +334,43 @@ def binary_coded_genetic_algorithm(C, R, B):
 
         # MUTATION
         for i in range(len(offspring_population)):
-            temp = mutate(offspring_population[i])
+            offspring_population[i] = mutate(offspring_population[i])
 
-            # Repair infeasible solution
-            if is_feasible(temp,R,B):
-                offspring_population[i] = temp
-            else:
-                offspring_population[i] = repair_chromosome_random(temp,C,R,B)
-
+        # Repair infeasible solution
+        offspring_population = [
+            repair_chromosome_random(c, C, R, B)
+            if not is_feasible(c, R, B)
+            else c
+            for c in offspring_population
+        ]
 
         # Evaluate offspring fitness 
-        offspring_fitness = [fitness(ind, C, R, B) for ind in offspring_population]
+        offspring_fitness = [fitness(ind, C, R) for ind in offspring_population]
 
-        # Combine
-        combined_population = list(population) + offspring_population
-        combined_fitness = list(fitness_values) + offspring_fitness
+        # Combine + elitist selection
+        combined = list(zip(
+            list(population) + offspring_population,
+            list(fitness_values) + offspring_fitness
+        ))
+        combined.sort(key=lambda x: x[1], reverse=True)
+        combined = combined[:POP_SIZE]
 
-        # Sort
-        sorted_indices = np.argsort(combined_fitness)[::-1]
+        # Paired
+        population, fitness_values = zip(*combined)
+        population = list(population)
+        fitness_values = list(fitness_values)
 
-        # Select next generation
-        population = [combined_population[i] for i in sorted_indices[:POP_SIZE]]
-        fitness_values = [combined_fitness[i] for i in sorted_indices[:POP_SIZE]]
+        # Update best
+        gen_best = fitness_values[0]
+        if gen_best > best_fitness:
+            best_fitness = gen_best
+            best_solution = population[0].copy()
 
-        # Best of this generation
-        gen_best_fitness = combined_fitness[sorted_indices[0]]
-        best_fitness_per_gen.append(gen_best_fitness)
+        best_fitness_so_far_per_gen.append(best_fitness)
 
-        # Update global best
-        if gen_best_fitness > best_fitness:
-            best_fitness = gen_best_fitness
-            best_solution = population[0]
+        # print(f"Generation {gen+1}: Best Fitness So Far = {best_fitness}")
 
-        # print(f"Generation {gen+1}: Best Fitness = {gen_best_fitness}")
-
-    return best_solution, best_fitness, best_fitness_per_gen
+    return best_solution, best_fitness, best_fitness_so_far_per_gen
 
 
 # ================================================================
@@ -376,12 +441,15 @@ def solve_gap_file(filename):
 
             run_time = end_time - start_time
 
+            feasible = is_feasible(best_assignment,R,B)
+
             all_histories.append(fitness_per_gen)
             all_best_sol.append(best_assignment)
             all_best_costs.append(best_cost)
             all_times.append(run_time)
 
-            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec")
+            print(f"  Run {run+1}: Best Cost = {best_cost}, Time = {run_time:.4f} sec, Feasible = {feasible}")
+
 
         # Convert to numpy array for easier computation
         all_histories = np.array(all_histories)
@@ -401,14 +469,14 @@ def solve_gap_file(filename):
         # Plot average (bold)
         plt.plot(avg_fitness, linewidth=2, label="Average")
 
-        plt.xlabel("Generation")
-        plt.ylabel("Best Fitness")
-        plt.title(f"CONVERGENCE PLOT || BCGA(repair based using random) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
+        plt.xlabel("GENERATION")
+        plt.ylabel("BEST COST")
+        plt.title(f"CONVERGENCE GRAPH || BINARY CODED GENETIC ALGORITHM || REAPAIR BASED (RANDOM) || {os.path.splitext(os.path.basename(filename))[0]} || Instance {idx}")
         plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_repair_random_convergence.png", dpi=300)
+        # os.makedirs("plots", exist_ok=True)
+        # plt.savefig(f"plots/{os.path.splitext(os.path.basename(filename))[0]}_instance_{idx}_BCGA_repair_cost_convergence.png", dpi=300)
         plt.show()
 
         # Store results
@@ -422,7 +490,6 @@ def solve_gap_file(filename):
         })
 
     return results
-
 
 # ==========================================================
 # ITERATE OVER ALL FILES
@@ -438,7 +505,6 @@ def solve_multiple_files(file_list,base_dir="gap_dataset"):
 
     for file in file_list:
         file_path = os.path.join( dataset_dir,file)
-        file_path = os.path.join(dataset_dir,file)
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"GAP file not found: {file_path}")
@@ -460,11 +526,11 @@ files = [
     # "gap5.txt",
     # "gap6.txt",
     # "gap7.txt",
-    "gap8.txt",
+    # "gap8.txt",
     # "gap9.txt",
     # "gap10.txt",
     # "gap11.txt",    
-    # "gap12.txt"
+    "gap12.txt"
 ]
 
 

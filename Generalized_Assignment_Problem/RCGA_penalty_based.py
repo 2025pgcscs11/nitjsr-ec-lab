@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # ==========================================================
 # CONSTANT PARAMETERS
 # ==========================================================
-POP_SIZE = 300
-GENERATIONS = 100
+POP_SIZE = 100
+GENERATIONS = 200
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.1
 DISTRIBUTIOIN_INDEX = 20
